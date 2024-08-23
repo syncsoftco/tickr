@@ -32,32 +32,40 @@ def get_github_repo():
 def fetch_and_save_candles(symbol):
     print(f"Fetching 1m candles for {symbol}...")
     
-    # Fetch 1-minute candles from the exchange
-    since = exchange.parse8601('2021-01-01T00:00:00Z')
-    candles = exchange.fetch_ohlcv(symbol, '1m', since=since)
+    try:
+        # Fetch 1-minute candles from the exchange
+        since = exchange.parse8601('2021-01-01T00:00:00Z')
+        candles = exchange.fetch_ohlcv(symbol, '1m', since=since)
 
-    df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-    df.set_index('timestamp', inplace=True)
+        df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df.set_index('timestamp', inplace=True)
 
-    for timeframe in TIMEFRAMES:
-        resampled = df.resample(timeframe).agg({
-            'open': 'first',
-            'high': 'max',
-            'low': 'min',
-            'close': 'last',
-            'volume': 'sum'
-        }).dropna()
-        
-        for name, group in resampled.groupby([resampled.index.year, resampled.index.month]):
-            year, month = name
-            shard_filename = f"{symbol.replace('/', '-')}_{timeframe}_{year}-{month:02d}.json"
-            file_path = os.path.join(DATA_DIR, symbol.replace('/', '-'), timeframe, str(year), f"{month:02d}", shard_filename)
-
-            if not os.path.exists(os.path.dirname(file_path)):
-                os.makedirs(os.path.dirname(file_path))
+        for timeframe in TIMEFRAMES:
+            resampled = df.resample(timeframe).agg({
+                'open': 'first',
+                'high': 'max',
+                'low': 'min',
+                'close': 'last',
+                'volume': 'sum'
+            }).dropna()
             
-            save_and_update_github(file_path, group, symbol, timeframe, year, month)
+            for name, group in resampled.groupby([resampled.index.year, resampled.index.month]):
+                year, month = name
+                shard_filename = f"{symbol.replace('/', '-')}_{timeframe}_{year}-{month:02d}.json"
+                file_path = os.path.join(DATA_DIR, symbol.replace('/', '-'), timeframe, str(year), f"{month:02d}", shard_filename)
+
+                if not os.path.exists(os.path.dirname(file_path)):
+                    os.makedirs(os.path.dirname(file_path))
+                
+                save_and_update_github(file_path, group, symbol, timeframe, year, month)
+
+    except ccxt.NetworkError as e:
+        print(f"Network error: {e}")
+    except ccxt.ExchangeError as e:
+        print(f"Exchange error: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
 
 def save_and_update_github(file_path, resampled, symbol, timeframe, year, month):
     # Load existing data if file exists
@@ -90,11 +98,19 @@ def update_github_file(repo, file_path, symbol, timeframe, year, month):
 
     repo_file_path = os.path.relpath(file_path, DATA_DIR).replace('\\', '/')
     try:
-        contents = repo.get_contents(repo_file_path)
-        repo.update_file(contents.path, f"Update {symbol} {timeframe} candles for {year}-{month:02d}", content, contents.sha)
-    except Exception:
-        repo.create_file(repo_file_path, f"Add {symbol} {timeframe} candles for {year}-{month:02d}", content)
-        print(f"Created new shard file {repo_file_path} in GitHub repo.")
+        # Try to get the file contents to check if it exists
+        try:
+            contents = repo.get_contents(repo_file_path)
+            repo.update_file(contents.path, f"Update {symbol} {timeframe} candles for {year}-{month:02d}", content, contents.sha)
+        except github.GithubException as e:
+            if e.status == 404:
+                # If the file does not exist, create it
+                repo.create_file(repo_file_path, f"Add {symbol} {timeframe} candles for {year}-{month:02d}", content)
+            else:
+                raise
+
+    except github.GithubException as e:
+        print(f"GitHub API error: {e}")
 
 def main():
     if not os.path.exists(DATA_DIR):
