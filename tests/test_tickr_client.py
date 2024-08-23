@@ -8,11 +8,11 @@ License: MIT
 
 import unittest
 from unittest.mock import patch, MagicMock
-from tickr.ticker_client import TickrClient
+from tickr.tickr_client import TickrClient
 from datetime import datetime, timedelta
 
 class TestTickrClient(unittest.TestCase):
-    @patch('tickr.ticker_client.Github')
+    @patch('tickr.tickr_client.Github')
     def setUp(self, MockGithub):
         """
         Set up the TickrClient for testing with mocked GitHub API responses.
