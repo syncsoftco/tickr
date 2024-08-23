@@ -29,7 +29,7 @@
 2. Install the required Python packages:
 
    ```bash
-   pip install -r requirements.txt
+   pip install .
    ```
 ### Usage
 
@@ -42,7 +42,7 @@ The **TickrClient** class provides a high-level interface to access candle data.
 Example usage:
 
 ```python
-from tickr_client import TickrClient
+from tickr.tickr_client import TickrClient
 
 # Initialize TickrClient
 client = TickrClient()
