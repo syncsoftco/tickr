@@ -25,9 +25,9 @@ class TestFetchCandles(unittest.TestCase):
         mock_save_and_update.assert_called()
 
         # Check that the correct sharded file paths were used in the save_and_update_github call
-        expected_file_path = 'data/BTC-USDT/1m/2021/01/BTC-USDT_1m_2021-01.json'
-        args, kwargs = mock_save_and_update.call_args
-        self.assertIn(expected_file_path, args)
+        expected_file_path = 'data/BTC-USDT/1min/2021/01/BTC-USDT_1min_2021-01.json'
+        called_file_path = mock_save_and_update.call_args[0][0]  # First positional argument is the file path
+        self.assertEqual(expected_file_path, called_file_path)
 
 if __name__ == '__main__':
     unittest.main()
