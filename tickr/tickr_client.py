@@ -108,8 +108,8 @@ class TickrClient:
             '1h': 3600,
             '6h': 21600,
             '12h': 43200,
-            '1D': 86400,
-            '1W': 604800,
+            '1d': 86400,
+            '1w': 604800,
         }
 
         if timeframe not in timeframe_seconds:
