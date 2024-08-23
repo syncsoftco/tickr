@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 from tickr.tickr_client import TickrClient
 from datetime import datetime, timedelta
+import json
 
 class TestTickrClient(unittest.TestCase):
     @patch('tickr.tickr_client.Github')
