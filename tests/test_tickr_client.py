@@ -35,6 +35,8 @@ class TestTickrClient(unittest.TestCase):
         symbol = "BTC/USDT"
         timeframe = "1h"
         candles = self.client.get_candles(symbol, timeframe)
+        
+        print(f"Mocked candles: {candles}")
 
         self.assertIsNotNone(candles, "Candles should not be None")
         self.assertTrue(len(candles) > 0, "Candles should contain data")
@@ -49,6 +51,8 @@ class TestTickrClient(unittest.TestCase):
         end_date = datetime.now() - timedelta(days=1)
 
         candles = self.client.get_candles(symbol, timeframe, start_date=start_date, end_date=end_date)
+        
+        print(f"Custom range candles: {candles}")
 
         self.assertIsNotNone(candles, "Candles should not be None")
         self.assertTrue(len(candles) > 0, "Candles should contain data")
