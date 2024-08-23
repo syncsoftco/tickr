@@ -4,7 +4,7 @@ setup(
     name='tickr',
     version='1.0.0',
     description='A high-level API client for accessing cryptocurrency candle data from a GitHub repository.',
-    author='Patrick',
+    author='syncsoftco',
     license='MIT',
     packages=find_packages(),
     install_requires=[
