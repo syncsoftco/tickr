@@ -42,20 +42,55 @@ class TickrClient:
         if start_date is None:
             start_date = self._calculate_default_start_date(end_date, timeframe)
         
-        file_path = f"data/{symbol.replace('/', '-')}_{timeframe}.json"
-        try:
-            file_content = self.repo.get_contents(file_path)
-            candles = json.loads(file_content.decoded_content.decode())
+        # Get list of file paths to check
+        file_paths = self._get_sharded_file_paths(symbol, timeframe, start_date, end_date)
+        candles = []
 
-            start_timestamp = self._convert_to_timestamp(start_date)
-            end_timestamp = self._convert_to_timestamp(end_date)
+        # Load candles from each relevant file
+        for file_path in file_paths:
+            try:
+                file_content = self.repo.get_contents(file_path)
+                file_candles = json.loads(file_content.decoded_content.decode())
+                candles.extend(file_candles)
+            except Exception as e:
+                print(f"Error fetching data from {file_path}: {e}")
+                continue
 
-            candles = [candle for candle in candles if self._is_within_range(candle[0], start_timestamp, end_timestamp)]
+        # Convert date range to timestamps
+        start_timestamp = self._convert_to_timestamp(start_date)
+        end_timestamp = self._convert_to_timestamp(end_date)
 
-            return candles
-        except Exception as e:
-            print(f"Error fetching data: {e}")
-            return None
+        # Filter candles within the specified range
+        candles = [candle for candle in candles if self._is_within_range(candle[0], start_timestamp, end_timestamp)]
+
+        return candles
+
+    def _get_sharded_file_paths(self, symbol, timeframe, start_date, end_date):
+        """
+        Constructs the list of file paths that may contain data within the given date range.
+
+        :param symbol: The trading symbol (e.g., 'BTC/USDT').
+        :param timeframe: The timeframe (e.g., '1m', '5m', '1h', '1d').
+        :param start_date: The start date for the data (datetime).
+        :param end_date: The end date for the data (datetime).
+        :return: A list of file paths to check in the repository.
+        """
+        file_paths = []
+        current_date = start_date
+
+        while current_date <= end_date:
+            year = current_date.year
+            month = current_date.month
+            file_name = f"{symbol.replace('/', '-')}_{timeframe}_{year}-{month:02d}.json"
+            file_path = f"data/{symbol.replace('/', '-')}/{timeframe}/{year}/{month:02d}/{file_name}"
+            file_paths.append(file_path)
+
+            # Move to the next month
+            next_month = month % 12 + 1
+            next_year = year + (1 if next_month == 1 else 0)
+            current_date = datetime(next_year, next_month, 1)
+
+        return file_paths
 
     def _calculate_default_start_date(self, end_date, timeframe):
         """
