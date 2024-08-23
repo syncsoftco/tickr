@@ -12,6 +12,7 @@ import json
 import os
 from datetime import datetime
 from github import Github
+from github import GithubException
 import pandas as pd
 
 # Configuration
@@ -102,14 +103,14 @@ def update_github_file(repo, file_path, symbol, timeframe, year, month):
         try:
             contents = repo.get_contents(repo_file_path)
             repo.update_file(contents.path, f"Update {symbol} {timeframe} candles for {year}-{month:02d}", content, contents.sha)
-        except github.GithubException as e:
+        except GithubException as e:
             if e.status == 404:
                 # If the file does not exist, create it
                 repo.create_file(repo_file_path, f"Add {symbol} {timeframe} candles for {year}-{month:02d}", content)
             else:
                 raise
 
-    except github.GithubException as e:
+    except GithubException as e:
         print(f"GitHub API error: {e}")
 
 def main():
