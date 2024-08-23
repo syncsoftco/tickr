@@ -20,9 +20,10 @@ class TestTickrClient(unittest.TestCase):
         """
         mock_repo = MockGithub().get_repo.return_value
         mock_file_content = MagicMock()
+        # Use fixed timestamps that should clearly fall within any reasonable date range
         mock_file_content.decoded_content = json.dumps([
-            [datetime.now().timestamp() * 1000, 29000, 29500, 28800, 29400, 1000],  # Current timestamp example
-            [datetime.now().timestamp() * 1000, 29400, 29700, 29200, 29500, 1200]
+            [1609459200000, 29000, 29500, 28800, 29400, 1000],  # 2021-01-01 00:00:00 UTC
+            [1609545600000, 29400, 29700, 29200, 29500, 1200]   # 2021-01-02 00:00:00 UTC
         ]).encode('utf-8')  # Ensure this is in bytes as expected from GitHub API
         mock_repo.get_contents.return_value = mock_file_content
         
@@ -47,8 +48,8 @@ class TestTickrClient(unittest.TestCase):
         """
         symbol = "BTC/USDT"
         timeframe = "1h"
-        start_date = datetime.now() - timedelta(days=7)
-        end_date = datetime.now()
+        start_date = datetime(2021, 1, 1)
+        end_date = datetime(2021, 1, 3)
 
         candles = self.client.get_candles(symbol, timeframe, start_date=start_date, end_date=end_date)
         
