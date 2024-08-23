@@ -15,8 +15,8 @@ from github import Github
 import pandas as pd
 
 # Configuration
-EXCHANGE_ID = 'binance' # TODO: parameterize this
-SYMBOLS = ['BTC/USDT']  # TODO: Add more symbols or paramaterize if needed
+EXCHANGE_ID = 'kraken' # TODO: parameterize this
+SYMBOLS = ['BTC/USD']  # TODO: Add more symbols or paramaterize if needed
 TIMEFRAMES = ['1m', '5m', '15m', '1h', '6h', '12h', '1d', '1w']
 DATA_DIR = 'data'
 
