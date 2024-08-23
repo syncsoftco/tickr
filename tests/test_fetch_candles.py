@@ -26,7 +26,7 @@ class TestFetchCandles(unittest.TestCase):
         # Check that save_and_update_github was called for each timeframe
         timeframes = ['1m', '5m', '15m', '1h', '6h', '12h', '1d', '1w']
         for timeframe in timeframes:
-            expected_file_path = f'data/BTC-USDT/{timeframe}/2021/01/BTC-USDT_{timeframe}_2021-01.json'
+            expected_file_path = f'data/BTC-USDT/{timeframe}/2021/01/kraken_BTC-USDT_{timeframe}_2021-01.json'
             called_file_path = mock_save_and_update.call_args_list[timeframes.index(timeframe)][0][0]
             self.assertEqual(expected_file_path, called_file_path)
 
