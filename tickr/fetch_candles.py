@@ -1,8 +1,8 @@
 """
 fetch_candles.py
 
-This script fetches the latest 1-minute cryptocurrency candle data using the CCXT library and resamples it
-to generate candles for larger timeframes. It then updates the local data files in the repository.
+This script fetches the latest cryptocurrency candle data using the CCXT library and updates
+the local data files in the repository. It is intended to be run manually or via a scheduled GitHub Actions workflow.
 
 License: MIT
 """
@@ -23,10 +23,15 @@ DATA_DIR = 'data'
 # Initialize exchange
 exchange = getattr(ccxt, EXCHANGE_ID)()
 
-# Load your GitHub token
-GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
-g = Github(GITHUB_TOKEN)
-repo = g.get_repo('your_username/tickr')  # Replace 'your_username/tickr' with your actual repo path
+def get_github_repo():
+    """
+    Initializes and returns the GitHub repository object.
+    This function allows delaying the GitHub initialization for easier testing and mocking.
+    """
+    GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
+    g = Github(GITHUB_TOKEN)
+    repo = g.get_repo('your_username/tickr')  # Replace 'your_username/tickr' with your actual repo path
+    return repo
 
 def fetch_and_save_candles(symbol):
     """
@@ -84,9 +89,10 @@ def save_and_update_github(file_path, resampled, symbol, timeframe):
         json.dump(combined_candles, f)
     
     # Update the file in the GitHub repository
-    update_github_file(file_path, symbol, timeframe)
+    repo = get_github_repo()
+    update_github_file(repo, file_path, symbol, timeframe)
 
-def update_github_file(file_path, symbol, timeframe):
+def update_github_file(repo, file_path, symbol, timeframe):
     """
     Updates the file in the GitHub repository with the latest candle data.
     """
