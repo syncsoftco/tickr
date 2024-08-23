@@ -97,18 +97,16 @@ def update_github_file(repo, file_path, symbol, timeframe, year, month):
     with open(file_path, 'r') as f:
         content = f.read()
 
-    repo_file_path = os.path.relpath(file_path, DATA_DIR).replace('\\', '/')
-
     # Try to get the file contents to check if it exists
     try:
-        contents = repo.get_contents(repo_file_path)
+        contents = repo.get_contents(file_path)
         repo.update_file(contents.path, f"Update {symbol} {timeframe} candles for {year}-{month:02d}", content, contents.sha)
     except GithubException as e:
         if e.status != 404:
             raise
 
         # If the file does not exist, create it
-        repo.create_file(repo_file_path, f"Add {symbol} {timeframe} candles for {year}-{month:02d}", content)
+        repo.create_file(file_path, f"Add {symbol} {timeframe} candles for {year}-{month:02d}", content)
 
 def main():
     if not os.path.exists(DATA_DIR):
