@@ -71,7 +71,7 @@ class TickrClient:
         Constructs the list of file paths that may contain data within the given date range.
 
         :param symbol: The trading symbol (e.g., 'BTC/USDT').
-        :param timeframe: The timeframe (e.g., '1min', '5min', '1h', '1d').
+        :param timeframe: The timeframe (e.g., '1m', '5m', '1h', '1d').
         :param start_date: The start date for the data (datetime).
         :param end_date: The end date for the data (datetime).
         :return: A list of file paths to check in the repository.
@@ -98,16 +98,16 @@ class TickrClient:
         Calculates the default start date based on the given timeframe, aiming to fetch the last 100 candles.
 
         :param end_date: The end date for the data (datetime).
-        :param timeframe: The timeframe (e.g., '1min', '5min', '1h', '1d').
+        :param timeframe: The timeframe (e.g., '1m', '5m', '1h', '1d').
         :return: The calculated start date (datetime).
         """
         timeframe_seconds = {
-            '1min': 60,
-            '5min': 300,
-            '15min': 900,
-            '1H': 3600,
-            '6H': 21600,
-            '12H': 43200,
+            '1m': 60,
+            '5m': 300,
+            '15m': 900,
+            '1h': 3600,
+            '6h': 21600,
+            '12h': 43200,
             '1D': 86400,
             '1W': 604800,
         }
