@@ -8,7 +8,7 @@ License: MIT
 
 import unittest
 from unittest.mock import patch, MagicMock
-from tickr_client import TickrClient
+from tickr.tickr_client import TickrClient
 from datetime import datetime, timedelta
 
 class TestTickrClient(unittest.TestCase):
