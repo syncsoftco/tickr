@@ -21,10 +21,10 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install ccxt PyGithub pandas
+        pip install .
 
     - name: Fetch and update candles
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token for authentication
       run: |
-        python fetch_candles.py
+        python -m 'tickr.fetch_candles'
