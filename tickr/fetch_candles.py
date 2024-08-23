@@ -72,8 +72,12 @@ def save_and_update_github(file_path, resampled, symbol, timeframe, year, month)
     else:
         combined_df = resampled
 
+    # Convert the DataFrame index (Timestamp) to milliseconds since epoch
     combined_df.reset_index(inplace=True)
+    combined_df['timestamp'] = combined_df['timestamp'].apply(lambda x: int(x.timestamp() * 1000))
     combined_candles = combined_df.to_dict('records')
+
+    # Save updated data back to the file
     with open(file_path, 'w') as f:
         json.dump(combined_candles, f)
 
