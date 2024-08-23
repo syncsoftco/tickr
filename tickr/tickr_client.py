@@ -30,7 +30,7 @@ class TickrClient:
         it defaults to fetching the most recent 100 candles.
 
         :param symbol: The trading symbol (e.g., 'BTC/USDT').
-        :param timeframe: The timeframe (e.g., '1min', '5min', '1h', '1d').
+        :param timeframe: The timeframe (e.g., '1m', '5m', '1h', '1d').
         :param start_date: (Optional) The start date for the data (datetime or epoch timestamp).
         :param end_date: (Optional) The end date for the data (datetime or epoch timestamp).
         :return: A list of candles within the specified time range.
