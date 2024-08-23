@@ -8,7 +8,9 @@ setup(
     license='MIT',
     packages=find_packages(),
     install_requires=[
-        'PyGithub>=1.55',
+        'PyGithub>=1.55,<2.0',
+        'ccxt>=4.3.87,<5.0',
+        'pandas>=2.2.2,<3.0',
     ],
     classifiers=[
         'Programming Language :: Python :: 3',
