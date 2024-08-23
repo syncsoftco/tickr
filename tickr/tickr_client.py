@@ -11,7 +11,6 @@ from github import Github
 import json
 from datetime import datetime, timedelta
 import time
-import calendar
 
 class TickrClient:
     def __init__(self, token=None):
