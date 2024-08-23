@@ -16,7 +16,7 @@ from github import GithubException
 import pandas as pd
 
 # Configuration
-EXCHANGE_ID = 'kraken' # TODO: parameterize this
+EXCHANGE_ID = 'kraken'  # TODO: parameterize this
 SYMBOLS = ['BTC/USD']  # TODO: Add more symbols or paramaterize if needed
 TIMEFRAMES = ['1m', '5m', '15m', '1h', '6h', '12h', '1d', '1w']
 DATA_DIR = 'data'
@@ -27,12 +27,12 @@ exchange = getattr(ccxt, EXCHANGE_ID)()
 def get_github_repo():
     GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
     g = Github(GITHUB_TOKEN)
-    repo = g.get_repo('syncsoftco/tickr') # TODO: parameterize this
+    repo = g.get_repo('syncsoftco/tickr')  # TODO: parameterize this
     return repo
 
 def fetch_and_save_candles(symbol):
-    print(f"Fetching 1m candles for {symbol}...")
-    
+    print(f"Fetching 1m candles for {symbol} on {EXCHANGE_ID}...")
+
     try:
         # Fetch 1-minute candles from the exchange
         since = exchange.parse8601('2021-01-01T00:00:00Z')
@@ -49,11 +49,14 @@ def fetch_and_save_candles(symbol):
                 'low': 'min',
                 'close': 'last',
                 'volume': 'sum'
-            }).dropna()
+            }).dropna(how='all')  # Drop rows where all elements are NaN
             
+            if resampled.empty:
+                continue  # Skip if the resampled DataFrame is empty
+
             for name, group in resampled.groupby([resampled.index.year, resampled.index.month]):
                 year, month = name
-                shard_filename = f"{symbol.replace('/', '-')}_{timeframe}_{year}-{month:02d}.json"
+                shard_filename = f"{EXCHANGE_ID}_{symbol.replace('/', '-')}_{timeframe}_{year}-{month:02d}.json"
                 file_path = os.path.join(DATA_DIR, symbol.replace('/', '-'), timeframe, str(year), f"{month:02d}", shard_filename)
 
                 if not os.path.exists(os.path.dirname(file_path)):
