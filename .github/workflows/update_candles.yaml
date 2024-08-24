@@ -7,6 +7,12 @@ on:
 
 jobs:
   update-candles:
+    strategy:
+      matrix:
+        exchange: ["kraken"]
+        symbol: ["BTC-USD", "ETH-USD"]
+        timeframe: ['1m', '5m', '15m', '1h', '6h', '12h', '1d', '1w']
+          
     runs-on: ubuntu-latest
 
     steps:
@@ -27,7 +33,10 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token for authentication
       run: |
-        python -m 'tickr.fetch_candles'
+        python -m 'tickr.fetch_candles' \
+          --exchange=${{ matrix.exchange }} \
+          --symbol=${{ matrix.symbol }} \
+          --matrix=${{ exchange.timeframe }}
 
     - name: Semantic Version
       id: version
