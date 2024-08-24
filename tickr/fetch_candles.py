@@ -17,8 +17,8 @@ import pandas as pd
 
 # Configuration
 EXCHANGE_ID = 'kraken'  # TODO: parameterize this
-SYMBOLS = ['BTC/USD']  # TODO: Add more symbols or paramaterize if needed
-TIMEFRAMES = ['1m', '5m', '15m', '1h', '6h', '12h', '1d', '1w']
+SYMBOLS = ['BTC/USD']  # TODO: Add more symbols or parameterize if needed
+TIMEFRAMES = ['1T', '5T', '15T', '1H', '6H', '12H', '1D', '1W']  # Updated timeframes
 DATA_DIR = 'data'
 
 # Initialize exchange
@@ -57,7 +57,7 @@ def fetch_and_save_candles(symbol):
             for name, group in resampled.groupby([resampled.index.year, resampled.index.month]):
                 year, month = name
                 shard_filename = f"{EXCHANGE_ID}_{symbol.replace('/', '-')}_{timeframe}_{year}-{month:02d}.json"
-                file_path = os.path.join(DATA_DIR, symbol.replace('/', '-'), timeframe, str(year), f"{month:02d}", shard_filename)
+                file_path = os.path.join(DATA_DIR, EXCHANGE_ID, symbol.replace('/', '-'), timeframe, str(year), f"{month:02d}", shard_filename)
 
                 if not os.path.exists(os.path.dirname(file_path)):
                     os.makedirs(os.path.dirname(file_path))
