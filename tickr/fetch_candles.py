@@ -115,9 +115,9 @@ def save_and_update_github(file_path, group, symbol, timeframe, year, month, rep
             print(f"No changes detected for {file_path}. Skipping update.")
             os.remove(temp_file_path)
             return
-        else:
-            repo.update_file(contents.path, f"Update {symbol} {timeframe} candles for {year}-{month:02d}", new_content, contents.sha)
-            print(f"Updated {file_path} on GitHub.")
+
+        repo.update_file(contents.path, f"Update {symbol} {timeframe} candles for {year}-{month:02d}", new_content, contents.sha)
+        print(f"Updated {file_path} on GitHub.")
     except GithubException as e:
         if e.status == 404:
             with open(temp_file_path, 'r') as f:
