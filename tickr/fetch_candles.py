@@ -58,40 +58,32 @@ def fetch_and_save_candles(exchange, symbol, timeframe, data_dir, repo_name):
     if last_timestamp:
         print(f"Last recorded candle timestamp: {last_timestamp} (ms)")
 
-    try:
-        # Fetch candles from the exchange
-        since = last_timestamp + 1 if last_timestamp else exchange.parse8601('2021-01-01T00:00:00Z')
-        candles = exchange.fetch_ohlcv(symbol, timeframe, since=since)
+    # Fetch candles from the exchange
+    since = last_timestamp + 1 if last_timestamp else exchange.parse8601('2021-01-01T00:00:00Z')
+    candles = exchange.fetch_ohlcv(symbol, timeframe, since=since)
 
-        if candles:
-            # Remove the current candle (if any)
-            current_time = int(datetime.now().timestamp() * 1000)
-            candles = [candle for candle in candles if candle[0] < current_time]
+    if candles:
+        # Remove the current candle (if any)
+        current_time = int(datetime.now().timestamp() * 1000)
+        candles = [candle for candle in candles if candle[0] < current_time]
 
-            if not candles:
-                print("No new candles to record.")
-                return
+        if not candles:
+            print("No new candles to record.")
+            return
 
-            df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-            df.set_index('timestamp', inplace=True)
+        df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df.set_index('timestamp', inplace=True)
 
-            for name, group in df.groupby([df.index.year, df.index.month]):
-                year, month = name
-                shard_filename = f"{exchange.id}_{symbol.replace('/', '-')}_{timeframe}_{year}-{month:02d}.json"
-                file_path = os.path.join(data_dir, exchange.id, symbol.replace('/', '-'), timeframe, str(year), f"{month:02d}", shard_filename)
+        for name, group in df.groupby([df.index.year, df.index.month]):
+            year, month = name
+            shard_filename = f"{exchange.id}_{symbol.replace('/', '-')}_{timeframe}_{year}-{month:02d}.json"
+            file_path = os.path.join(data_dir, exchange.id, symbol.replace('/', '-'), timeframe, str(year), f"{month:02d}", shard_filename)
 
-                if not os.path.exists(os.path.dirname(file_path)):
-                    os.makedirs(os.path.dirname(file_path))
-                
-                save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name)
-
-    except ccxt.NetworkError as e:
-        print(f"Network error: {e}")
-    except ccxt.ExchangeError as e:
-        print(f"Exchange error: {e}")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+            if not os.path.exists(os.path.dirname(file_path)):
+                os.makedirs(os.path.dirname(file_path))
+            
+            save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name)
 
 def save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name):
     combined_df = group
