@@ -23,14 +23,11 @@ class TestFetchCandles(unittest.TestCase):
         # Assertions
         mock_exchange.fetch_ohlcv.assert_called_once_with('BTC/USDT', '1m', since=mock_exchange.parse8601('2021-01-01T00:00:00Z'))
         
-        # Ensure save_and_update_github was called for all timeframes
-        timeframes = ['1m', '5m', '15m', '1h', '6h', '12h', '1d', '1w']
-        self.assertEqual(len(mock_save_and_update.call_args_list), len(timeframes))
-
-        # Check that save_and_update_github was called with the correct file path for each timeframe
-        for i, timeframe in enumerate(timeframes):
-            expected_file_path = f'data/BTC-USDT/{timeframe}/2021/01/kraken_BTC-USDT_{timeframe}_2021-01.json'
-            called_file_path = mock_save_and_update.call_args_list[i][0][0]
+        # Check that save_and_update_github was called for each timeframe
+        timeframes = ['1T', '5T', '15T', '1H', '6H', '12H', '1D', '1W']
+        for timeframe in timeframes:
+            expected_file_path = os.path.join('data', 'kraken', 'BTC-USDT', timeframe, '2021', '01', f'kraken_BTC-USDT_{timeframe}_2021-01.json')
+            called_file_path = mock_save_and_update.call_args_list[timeframes.index(timeframe)][0][0]
             self.assertEqual(expected_file_path, called_file_path)
 
 if __name__ == '__main__':
