@@ -14,55 +14,44 @@ from datetime import datetime
 from github import Github
 from github import GithubException
 import pandas as pd
+from absl import app, flags
 
 # Configuration
-EXCHANGE_ID = 'kraken'  # TODO: parameterize this
-SYMBOLS = ['BTC/USD']  # TODO: Add more symbols or parameterize if needed
-TIMEFRAMES = ['1T', '5T', '15T', '1H', '6H', '12H', '1D', '1W']  # Updated timeframes
-DATA_DIR = 'data'
+FLAGS = flags.FLAGS
 
-# Initialize exchange
-exchange = getattr(ccxt, EXCHANGE_ID)()
+flags.DEFINE_string('exchange', 'kraken', 'Exchange ID (e.g., kraken, binance)')
+flags.DEFINE_string('symbol', 'BTC/USD', 'Symbol to fetch data for (e.g., BTC/USD, ETH/USD)')
+flags.DEFINE_string('timeframe', '1m', 'Timeframe (e.g., 1m, 5m, 1h, 1d)')
+flags.DEFINE_string('data_dir', 'data', 'Directory to store the candle data')
+flags.DEFINE_string('repo_name', 'syncsoftco/tickr', 'GitHub repository name')
 
-def get_github_repo():
+def get_github_repo(repo_name):
     GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
     g = Github(GITHUB_TOKEN)
-    repo = g.get_repo('syncsoftco/tickr')  # TODO: parameterize this
+    repo = g.get_repo(repo_name)
     return repo
 
-def fetch_and_save_candles(symbol):
-    print(f"Fetching 1m candles for {symbol} on {EXCHANGE_ID}...")
+def fetch_and_save_candles(exchange, symbol, timeframe, data_dir, repo_name):
+    print(f"Fetching {timeframe} candles for {symbol} on {exchange.id}...")
 
     try:
-        # Fetch 1-minute candles from the exchange
+        # Fetch candles from the exchange
         since = exchange.parse8601('2021-01-01T00:00:00Z')
-        candles = exchange.fetch_ohlcv(symbol, '1m', since=since)
+        candles = exchange.fetch_ohlcv(symbol, timeframe, since=since)
 
         df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('timestamp', inplace=True)
 
-        for timeframe in TIMEFRAMES:
-            resampled = df.resample(timeframe).agg({
-                'open': 'first',
-                'high': 'max',
-                'low': 'min',
-                'close': 'last',
-                'volume': 'sum'
-            }).dropna(how='all')  # Drop rows where all elements are NaN
+        for name, group in df.groupby([df.index.year, df.index.month]):
+            year, month = name
+            shard_filename = f"{exchange.id}_{symbol.replace('/', '-')}_{timeframe}_{year}-{month:02d}.json"
+            file_path = os.path.join(data_dir, exchange.id, symbol.replace('/', '-'), timeframe, str(year), f"{month:02d}", shard_filename)
+
+            if not os.path.exists(os.path.dirname(file_path)):
+                os.makedirs(os.path.dirname(file_path))
             
-            if resampled.empty:
-                continue  # Skip if the resampled DataFrame is empty
-
-            for name, group in resampled.groupby([resampled.index.year, resampled.index.month]):
-                year, month = name
-                shard_filename = f"{EXCHANGE_ID}_{symbol.replace('/', '-')}_{timeframe}_{year}-{month:02d}.json"
-                file_path = os.path.join(DATA_DIR, EXCHANGE_ID, symbol.replace('/', '-'), timeframe, str(year), f"{month:02d}", shard_filename)
-
-                if not os.path.exists(os.path.dirname(file_path)):
-                    os.makedirs(os.path.dirname(file_path))
-                
-                save_and_update_github(file_path, group, symbol, timeframe, year, month)
+            save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name)
 
     except ccxt.NetworkError as e:
         print(f"Network error: {e}")
@@ -71,7 +60,7 @@ def fetch_and_save_candles(symbol):
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 
-def save_and_update_github(file_path, resampled, symbol, timeframe, year, month):
+def save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name):
     # Load existing data if file exists
     if os.path.exists(file_path):
         with open(file_path, 'r') as f:
@@ -79,10 +68,10 @@ def save_and_update_github(file_path, resampled, symbol, timeframe, year, month)
         existing_df = pd.DataFrame(existing_candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         existing_df['timestamp'] = pd.to_datetime(existing_df['timestamp'], unit='ms')
         existing_df.set_index('timestamp', inplace=True)
-        combined_df = pd.concat([existing_df, resampled])
+        combined_df = pd.concat([existing_df, group])
         combined_df = combined_df[~combined_df.index.duplicated(keep='last')]
     else:
-        combined_df = resampled
+        combined_df = group
 
     # Convert the DataFrame index (Timestamp) to milliseconds since epoch
     combined_df.reset_index(inplace=True)
@@ -93,9 +82,8 @@ def save_and_update_github(file_path, resampled, symbol, timeframe, year, month)
     with open(file_path, 'w') as f:
         json.dump(combined_candles, f, indent=4)  # Added indent=4 for pretty printing
 
-    repo = get_github_repo()
+    repo = get_github_repo(repo_name)
     update_github_file(repo, file_path, symbol, timeframe, year, month)
-
 
 def update_github_file(repo, file_path, symbol, timeframe, year, month):
     with open(file_path, 'r') as f:
@@ -112,12 +100,17 @@ def update_github_file(repo, file_path, symbol, timeframe, year, month):
         # If the file does not exist, create it
         repo.create_file(file_path, f"Add {symbol} {timeframe} candles for {year}-{month:02d}", content)
 
-def main():
-    if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR)
+def main(argv):
+    exchange = getattr(ccxt, FLAGS.exchange)()
+    symbol = FLAGS.symbol
+    timeframe = FLAGS.timeframe
+    data_dir = FLAGS.data_dir
+    repo_name = FLAGS.repo_name
 
-    for symbol in SYMBOLS:
-        fetch_and_save_candles(symbol)
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    fetch_and_save_candles(exchange, symbol, timeframe, data_dir, repo_name)
 
 if __name__ == "__main__":
-    main()
+    app.run(main)
