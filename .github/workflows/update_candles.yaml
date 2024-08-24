@@ -1,4 +1,4 @@
-name: Update Candles and Update Version
+name: Update Candles
 
 on:
   schedule:
