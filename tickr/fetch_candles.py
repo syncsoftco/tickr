@@ -32,8 +32,11 @@ def get_github_repo(repo_name):
     return repo
 
 def fetch_and_save_candles(exchange, symbol, timeframe, data_dir, repo_name):
+    if timeframe not in exchange.timeframes:
+        raise ValueError("Unsupported timeframe: %s Supported timeframes: %s", timeframe, exchange.timeframes)
+    
     print(f"Fetching {timeframe} candles for {symbol} on {exchange.id}...")
-
+     
     # Prepare directories for saving data
     shard_dir = os.path.join(data_dir, exchange.id, symbol.replace('/', '-'), timeframe)
     if not os.path.exists(shard_dir):
