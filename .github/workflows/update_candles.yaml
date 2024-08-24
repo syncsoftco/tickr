@@ -9,7 +9,8 @@ jobs:
   update-candles:
     strategy:
       matrix:
-        version: [10, 12, 14]
+        symbol: ["BTC-USD", "ETH-USD"]
+        timeframe: ["1T", "5T", "15T"]
           
     runs-on: ubuntu-latest
 
