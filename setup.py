@@ -8,10 +8,10 @@ setup(
     license='MIT',
     packages=find_packages(),
     install_requires=[
-        'PyGithub>=1.55,<2.0',
         'absl-py>=2.1.0,<3.0',
         'backoff>=2.2.1,<3.0',
         'ccxt>=4.3.87,<5.0',
+        'fsspec>=2024.6.1',
         'pandas>=2.2.2,<3.0',
     ],
     classifiers=[

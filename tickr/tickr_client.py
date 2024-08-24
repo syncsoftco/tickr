@@ -7,22 +7,21 @@ The TickrClient class provides an easy interface to fetch the most recent candle
 License: MIT
 """
 
-from github import Github
 import json
 from datetime import datetime, timedelta
 import time
+import fsspec
 
 class TickrClient:
-    def __init__(self, token=None):
+    def __init__(self, repo_name="syncsoftco/tickr"):
         """
-        Initializes the TickrClient with an optional GitHub token.
+        Initializes the TickrClient.
         
-        :param token: (Optional) GitHub token for authenticated API requests.
+        :param repo_name: GitHub repository name (e.g., 'syncsoftco/tickr').
         """
-        self.github = Github(token)
-        self.repo_name = "syncsoftco/tickr"
-        self.repo = self.github.get_repo(self.repo_name)
-    
+        self.repo_name = repo_name
+        self.fs = fsspec.filesystem("github", org=repo_name.split('/')[0], repo=repo_name.split('/')[1])
+
     def get_candles(self, symbol, timeframe, start_date=None, end_date=None):
         """
         Fetches candle data for a given symbol and timeframe. If start_date and end_date are not provided,
@@ -49,9 +48,10 @@ class TickrClient:
         # Load candles from each relevant file
         for file_path in file_paths:
             try:
-                file_content = self.repo.get_contents(file_path)
-                file_candles = json.loads(file_content.decoded_content.decode())
-                candles.extend(file_candles)
+                if self.fs.exists(file_path):
+                    with self.fs.open(file_path, 'r') as f:
+                        file_candles = json.load(f)
+                        candles.extend(file_candles)
             except Exception as e:
                 print(f"Error fetching data from {file_path}: {e}")
                 continue
@@ -140,8 +140,5 @@ class TickrClient:
         :param end: The end timestamp (in milliseconds).
         :return: True if within range, False otherwise.
         """
-        if start and timestamp < start:
-            return False
-        if end and timestamp > end:
-            return False
-        return True
+        return start <= timestamp <= end
+
