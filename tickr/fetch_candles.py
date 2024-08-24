@@ -43,7 +43,7 @@ def fetch_and_save_candles(symbol):
         df.set_index('timestamp', inplace=True)
 
         for timeframe in TIMEFRAMES:
-            resampled = df.resample(timeframe).agg({
+            resampled = df.resample(timeframe, label='right', closed='right').agg({
                 'open': 'first',
                 'high': 'max',
                 'low': 'min',
@@ -51,6 +51,9 @@ def fetch_and_save_candles(symbol):
                 'volume': 'sum'
             }).dropna(how='all')  # Drop rows where all elements are NaN
             
+            # Align timestamps to be on the boundary of the timeframe
+            resampled.index = resampled.index.floor(freq=timeframe)
+
             if resampled.empty:
                 continue  # Skip if the resampled DataFrame is empty
 
@@ -100,16 +103,20 @@ def update_github_file(repo, file_path, symbol, timeframe, year, month):
     with open(file_path, 'r') as f:
         content = f.read()
 
+    # Ensure the file path is relative to the repository's root
+    repo_file_path = os.path.relpath(file_path, start=DATA_DIR).replace('\\', '/')
+    repo_file_path = f"data/{repo_file_path}"  # Ensure it resides in the data directory
+
     # Try to get the file contents to check if it exists
     try:
-        contents = repo.get_contents(file_path)
+        contents = repo.get_contents(repo_file_path)
         repo.update_file(contents.path, f"Update {symbol} {timeframe} candles for {year}-{month:02d}", content, contents.sha)
     except GithubException as e:
         if e.status != 404:
             raise
 
         # If the file does not exist, create it
-        repo.create_file(file_path, f"Add {symbol} {timeframe} candles for {year}-{month:02d}", content)
+        repo.create_file(repo_file_path, f"Add {symbol} {timeframe} candles for {year}-{month:02d}", content)
 
 def main():
     if not os.path.exists(DATA_DIR):
