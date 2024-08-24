@@ -8,7 +8,8 @@ setup(
     license='MIT',
     packages=find_packages(),
     install_requires=[
-        'absl-py>=2.1.0,<3',
+        'absl-py>=2.1.0,<3.0',
+        'backoff>=2.2.1,<3.0',
         'ccxt>=4.3.87,<5.0',
         'fsspec>=2024.6.1',
         'pandas>=2.2.2,<3.0',
