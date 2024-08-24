@@ -7,6 +7,10 @@ on:
 
 jobs:
   update-candles:
+    strategy:
+      matrix:
+        version: [10, 12, 14]
+          
     runs-on: ubuntu-latest
 
     steps:
@@ -27,4 +31,4 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token for authentication
       run: |
-        python -m 'tickr.fetch_candles'
+        python -m 'tickr.fetch_candles' --timeframe ${{ matrix.timeframe }} --symbol ${{ matrix.symbol }}
