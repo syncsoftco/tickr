@@ -74,24 +74,6 @@ python fetch_candles.py
 
 Tickr uses GitHub Actions to schedule and automate the data fetching process. The workflow is defined in `.github/workflows/update_candles.yml` and is set to run every 15 minutes.
 
-#### Reading Candle Data
-
-You can read the candle data directly from the repository using the provided PyGithub-based client:
-
-```python
-from github import Github
-import json
-
-# Initialize GitHub client
-g = Github("your_github_token")
-repo = g.get_repo("your_username/tickr")
-file_content = repo.get_contents("data/BTC-USDT_1m.json")
-
-# Load and use the data
-candles = json.loads(file_content.decoded_content.decode())
-print(candles[-5:])  # Print the last 5 candles
-```
-
 ### Extending Tickr
 
 To support additional assets or exchanges, you can modify the `symbols` and `exchange` settings in `fetch_candles.py`. The modular design allows easy adaptation to other data sources.
