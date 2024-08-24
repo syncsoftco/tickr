@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch, MagicMock, ANY
+from unittest.mock import patch, ANY, MagicMock
 from tickr.fetch_candles import fetch_and_save_candles
 
 class TestFetchCandles(unittest.TestCase):
