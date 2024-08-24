@@ -36,7 +36,7 @@ jobs:
         python -m 'tickr.fetch_candles' \
           --exchange=${{ matrix.timeframe }} \
           --symbol=${{ matrix.symbol }} \
-          --timeframe=${{ matrix.timeframe }}
+          --timeframe=${{ exchange.timeframe }}
 
     - name: Semantic Version
       id: version
