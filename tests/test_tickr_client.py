@@ -40,8 +40,6 @@ class TestTickrClient(unittest.TestCase):
         start_date = datetime(2021, 1, 1)  # Adjust this as needed to match mock data
         candles = self.client.get_candles(symbol, timeframe, start_date=start_date, end_date=end_date)
         
-        print(f"Mocked candles: {candles}")
-
         self.assertIsNotNone(candles, "Candles should not be None")
         self.assertTrue(len(candles) > 0, "Candles should contain data")
 
@@ -56,8 +54,6 @@ class TestTickrClient(unittest.TestCase):
 
         candles = self.client.get_candles(symbol, timeframe, start_date=start_date, end_date=end_date)
         
-        print(f"Custom range candles: {candles}")
-
         self.assertIsNotNone(candles, "Candles should not be None")
         self.assertTrue(len(candles) > 0, "Candles should contain data")
         self.assertTrue(all(start_date <= datetime.fromtimestamp(candle[0] / 1000) <= end_date for candle in candles), 
