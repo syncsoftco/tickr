@@ -34,7 +34,7 @@ def get_github_repo(repo_name):
 
 def fetch_and_save_candles(exchange, symbol, timeframe, data_dir, repo_name):
     if timeframe not in exchange.timeframes:
-        raise ValueError("Unsupported timeframe: %s Supported timeframes: %s", timeframe, exchange.timeframes)
+        raise ValueError(f"Unsupported timeframe: {timeframe} Supported timeframes: {exchange.timeframes}")
     
     print(f"Fetching {timeframe} candles for {symbol} on {exchange.id}...")
      
