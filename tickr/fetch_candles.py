@@ -7,6 +7,7 @@ the local data files in the repository. It is intended to be run manually or via
 License: MIT
 """
 
+import backoff
 import ccxt
 import json
 import os
@@ -88,6 +89,7 @@ def fetch_and_save_candles(exchange, symbol, timeframe, data_dir, repo_name):
             
             save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name)
 
+@backoff.on_exception(backoff.expo, GithubException, max_tries=3, giveup=lambda e: e.status != 409)
 def save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name):
     combined_df = group
 
