@@ -34,7 +34,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token for authentication
       run: |
         python -m 'tickr.fetch_candles' \
-          --exchange=${{ matrix.timeframe }} \
+          --exchange=${{ matrix.exchange }} \
           --symbol=${{ matrix.symbol }} \
           --timeframe=${{ exchange.timeframe }}
 
