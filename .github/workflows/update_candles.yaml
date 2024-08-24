@@ -39,7 +39,7 @@ jobs:
         version_format: "${major}.${minor}.${patch}-prerelease${increment}"
         enable_prerelease_mode: true
         change_path: "data"
-        namespace: db
+        namespace: data
 
     - name: Push Tag
       env:
