@@ -89,12 +89,13 @@ def save_and_update_github(file_path, resampled, symbol, timeframe, year, month)
     combined_df['timestamp'] = combined_df['timestamp'].apply(lambda x: int(x.timestamp() * 1000))
     combined_candles = combined_df.to_dict('records')
 
-    # Save updated data back to the file
+    # Save updated data back to the file with pretty printing
     with open(file_path, 'w') as f:
-        json.dump(combined_candles, f)
+        json.dump(combined_candles, f, indent=4)  # Added indent=4 for pretty printing
 
     repo = get_github_repo()
     update_github_file(repo, file_path, symbol, timeframe, year, month)
+
 
 def update_github_file(repo, file_path, symbol, timeframe, year, month):
     with open(file_path, 'r') as f:
