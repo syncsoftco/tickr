@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import patch, MagicMock
 from tickr.fetch_candles import fetch_and_save_candles
