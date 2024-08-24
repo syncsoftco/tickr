@@ -24,7 +24,7 @@ class TestFetchCandles(unittest.TestCase):
         fetch_and_save_candles(mock_exchange, 'BTC/USD', '1m', 'data', 'syncsoftco/tickr')
 
         # Assertions for supported timeframe
-        mock_exchange.fetch_ohlcv.assert_called_once_with('BTC/USD', '1m', since=mock_exchange.parse8601('2021-01-01T00:00:00Z'))
+        mock_exchange.fetch_ohlcv.assert_called_once_with('BTC/USD', '1m', since=1724528100001)
         
         # Check that save_and_update_github was called
         expected_file_path = 'data/kraken/BTC-USD/1m/2021/01/kraken_BTC-USD_1m_2021-01.json'
