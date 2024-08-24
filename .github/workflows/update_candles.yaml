@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         exchange: ["kraken"]
-        symbol: ["BTC-USD", "ETH-USD"]
+        symbol: ["BTC/USD", "ETH/USD"]
         timeframe: ['1m', '5m', '15m', '1h', '6h', '12h', '1d', '1w']
           
     runs-on: ubuntu-latest
