@@ -33,7 +33,10 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token for authentication
       run: |
-        python -m 'tickr.fetch_candles' --timeframe ${{ matrix.timeframe }} --symbol ${{ matrix.symbol }}
+        python -m 'tickr.fetch_candles' \
+          --exchange=${{ matrix.timeframe }} \
+          --symbol=${{ matrix.symbol }} \
+          --timeframe=${{ matrix.timeframe }}
 
     - name: Semantic Version
       id: version
