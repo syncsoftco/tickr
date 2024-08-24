@@ -11,10 +11,9 @@ import ccxt
 import json
 import os
 from datetime import datetime
-from github import Github
-from github import GithubException
 import pandas as pd
 from absl import app, flags
+import fsspec
 
 # Configuration
 FLAGS = flags.FLAGS
@@ -25,18 +24,12 @@ flags.DEFINE_string('timeframe', '1m', 'Timeframe (e.g., 1m, 5m, 1h, 1d)')
 flags.DEFINE_string('data_dir', 'data', 'Directory to store the candle data')
 flags.DEFINE_string('repo_name', 'syncsoftco/tickr', 'GitHub repository name')
 
-def get_github_repo(repo_name):
-    GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
-    g = Github(GITHUB_TOKEN)
-    repo = g.get_repo(repo_name)
-    return repo
-
 def fetch_and_save_candles(exchange, symbol, timeframe, data_dir, repo_name):
     if timeframe not in exchange.timeframes:
-        raise ValueError("Unsupported timeframe: %s Supported timeframes: %s", timeframe, exchange.timeframes)
+        raise ValueError(f"Unsupported timeframe: {timeframe}. Supported timeframes: {exchange.timeframes}")
     
     print(f"Fetching {timeframe} candles for {symbol} on {exchange.id}...")
-     
+
     # Prepare directories for saving data
     shard_dir = os.path.join(data_dir, exchange.id, symbol.replace('/', '-'), timeframe)
     if not os.path.exists(shard_dir):
@@ -101,49 +94,32 @@ def save_and_update_github(file_path, group, symbol, timeframe, year, month, rep
     with open(temp_file_path, 'w') as f:
         json.dump(combined_candles, f, indent=4)  # Added indent=4 for pretty printing
 
-    repo = get_github_repo(repo_name)
+    fs = fsspec.filesystem("github", org=repo_name.split('/')[0], repo=repo_name.split('/')[1])
 
     # Check if the file exists on GitHub and compare the content
     try:
-        contents = repo.get_contents(file_path)
-        existing_content = contents.decoded_content.decode('utf-8')
+        if fs.exists(file_path):
+            with fs.open(file_path, 'r') as f:
+                existing_content = f.read()
 
-        with open(temp_file_path, 'r') as f:
-            new_content = f.read()
-
-        if existing_content == new_content:
-            print(f"No changes detected for {file_path}. Skipping update.")
-            os.remove(temp_file_path)
-            return
-        else:
-            repo.update_file(contents.path, f"Update {symbol} {timeframe} candles for {year}-{month:02d}", new_content, contents.sha)
-            print(f"Updated {file_path} on GitHub.")
-    except GithubException as e:
-        if e.status == 404:
             with open(temp_file_path, 'r') as f:
                 new_content = f.read()
-            repo.create_file(file_path, f"Add {symbol} {timeframe} candles for {year}-{month:02d}", new_content)
-            print(f"Created {file_path} on GitHub.")
+
+            if existing_content == new_content:
+                print(f"No changes detected for {file_path}. Skipping update.")
+                os.remove(temp_file_path)
+                return
+            else:
+                with open(temp_file_path, 'r') as f:
+                    fs.pipe_file(file_path, f)
+                print(f"Updated {file_path} on GitHub.")
         else:
-            raise
-
-    # Save the new content locally
-    os.rename(temp_file_path, file_path)
-
-def update_github_file(repo, file_path, symbol, timeframe, year, month):
-    with open(file_path, 'r') as f:
-        content = f.read()
-
-    # Try to get the file contents to check if it exists
-    try:
-        contents = repo.get_contents(file_path)
-        repo.update_file(contents.path, f"Update {symbol} {timeframe} candles for {year}-{month:02d}", content, contents.sha)
-    except GithubException as e:
-        if e.status != 404:
-            raise
-
-        # If the file does not exist, create it
-        repo.create_file(file_path, f"Add {symbol} {timeframe} candles for {year}-{month:02d}", content)
+            with open(temp_file_path, 'r') as f:
+                fs.pipe_file(file_path, f)
+            print(f"Created {file_path} on GitHub.")
+    finally:
+        # Clean up temporary file
+        os.remove(temp_file_path)
 
 def main(argv):
     exchange = getattr(ccxt, FLAGS.exchange)()
