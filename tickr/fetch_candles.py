@@ -17,8 +17,8 @@ import pandas as pd
 
 # Configuration
 EXCHANGE_ID = 'kraken'  # TODO: parameterize this
-SYMBOLS = ['BTC/USD']  # TODO: Add more symbols or paramaterize if needed
-TIMEFRAMES = ['1m', '5m', '15m', '1h', '6h', '12h', '1d', '1w']
+SYMBOLS = ['BTC/USD']  # TODO: Add more symbols or parameterize if needed
+TIMEFRAMES = ['1T', '5T', '15T', '1H', '6H', '12H', '1D', '1W']  # Updated timeframes
 DATA_DIR = 'data'
 
 # Initialize exchange
@@ -43,7 +43,7 @@ def fetch_and_save_candles(symbol):
         df.set_index('timestamp', inplace=True)
 
         for timeframe in TIMEFRAMES:
-            resampled = df.resample(timeframe, label='right', closed='right').agg({
+            resampled = df.resample(timeframe).agg({
                 'open': 'first',
                 'high': 'max',
                 'low': 'min',
@@ -51,16 +51,13 @@ def fetch_and_save_candles(symbol):
                 'volume': 'sum'
             }).dropna(how='all')  # Drop rows where all elements are NaN
             
-            # Align timestamps to be on the boundary of the timeframe
-            resampled.index = resampled.index.floor(freq=timeframe)
-
             if resampled.empty:
                 continue  # Skip if the resampled DataFrame is empty
 
             for name, group in resampled.groupby([resampled.index.year, resampled.index.month]):
                 year, month = name
                 shard_filename = f"{EXCHANGE_ID}_{symbol.replace('/', '-')}_{timeframe}_{year}-{month:02d}.json"
-                file_path = os.path.join(DATA_DIR, symbol.replace('/', '-'), timeframe, str(year), f"{month:02d}", shard_filename)
+                file_path = os.path.join(DATA_DIR, EXCHANGE_ID, symbol.replace('/', '-'), timeframe, str(year), f"{month:02d}", shard_filename)
 
                 if not os.path.exists(os.path.dirname(file_path)):
                     os.makedirs(os.path.dirname(file_path))
@@ -103,20 +100,16 @@ def update_github_file(repo, file_path, symbol, timeframe, year, month):
     with open(file_path, 'r') as f:
         content = f.read()
 
-    # Ensure the file path is relative to the repository's root
-    repo_file_path = os.path.relpath(file_path, start=DATA_DIR).replace('\\', '/')
-    repo_file_path = f"data/{repo_file_path}"  # Ensure it resides in the data directory
-
     # Try to get the file contents to check if it exists
     try:
-        contents = repo.get_contents(repo_file_path)
+        contents = repo.get_contents(file_path)
         repo.update_file(contents.path, f"Update {symbol} {timeframe} candles for {year}-{month:02d}", content, contents.sha)
     except GithubException as e:
         if e.status != 404:
             raise
 
         # If the file does not exist, create it
-        repo.create_file(repo_file_path, f"Add {symbol} {timeframe} candles for {year}-{month:02d}", content)
+        repo.create_file(file_path, f"Add {symbol} {timeframe} candles for {year}-{month:02d}", content)
 
 def main():
     if not os.path.exists(DATA_DIR):
