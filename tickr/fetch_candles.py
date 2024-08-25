@@ -94,7 +94,6 @@ def extract_timestamp(x):
         return x
 
     return x.timestamp()
-        
 
 @backoff.on_exception(backoff.expo, GithubException, max_tries=3, giveup=lambda e: e.status != 409)
 def save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name):
