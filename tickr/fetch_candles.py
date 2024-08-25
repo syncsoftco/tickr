@@ -89,13 +89,20 @@ def fetch_and_save_candles(exchange, symbol, timeframe, data_dir, repo_name):
             
             save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name)
 
+def extract_timestamp(x):
+    if isinstance(x, int):
+        return x
+
+    return x.timestamp()
+        
+
 @backoff.on_exception(backoff.expo, GithubException, max_tries=3, giveup=lambda e: e.status != 409)
 def save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name):
     combined_df = group
 
     # Convert the DataFrame index (Timestamp) to milliseconds since epoch
     combined_df.reset_index(inplace=True)
-    combined_df['timestamp'] = combined_df['timestamp'].apply(lambda x: int(x.timestamp() * 1000))
+    combined_df['timestamp'] = combined_df['timestamp'].apply(lambda x: int(extract_timestamp(x) * 1000))
     combined_candles = combined_df.to_dict('records')
 
     # Save the data to a temporary location first
