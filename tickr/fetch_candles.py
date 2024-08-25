@@ -12,8 +12,7 @@ import ccxt
 import json
 import os
 from datetime import datetime
-from github import Github
-from github import GithubException
+import subprocess
 import pandas as pd
 from absl import app, flags
 
@@ -26,44 +25,33 @@ flags.DEFINE_string('timeframe', '1m', 'Timeframe (e.g., 1m, 5m, 1h, 1d)')
 flags.DEFINE_string('data_dir', 'data', 'Directory to store the candle data')
 flags.DEFINE_string('repo_name', 'syncsoftco/tickr', 'GitHub repository name')
 
-def get_github_repo(repo_name):
-    GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
-    g = Github(GITHUB_TOKEN)
-    repo = g.get_repo(repo_name)
-    return repo
-
-def fetch_and_save_candles(exchange, symbol, timeframe, data_dir, repo_name):
+def fetch_and_save_candles(exchange, symbol, timeframe, data_dir):
     if timeframe not in exchange.timeframes:
-        raise ValueError(f"Unsupported timeframe: {timeframe} Supported timeframes: {exchange.timeframes}")
+        raise ValueError(f"Unsupported timeframe: {timeframe}. Supported timeframes: {exchange.timeframes}")
     
     print(f"Fetching {timeframe} candles for {symbol} on {exchange.id}...")
-     
-    # Prepare directories for saving data
-    shard_dir = os.path.join(data_dir, exchange.id, symbol.replace('/', '-'), timeframe)
-    if not os.path.exists(shard_dir):
-        os.makedirs(shard_dir)
+
+    # Determine the directory and base filename
+    base_filename = f"{exchange.id}_{symbol.replace('/', '-')}_{timeframe}"
+    os.makedirs(os.path.join(data_dir, exchange.id), exist_ok=True)
 
     # Determine the last recorded candle's timestamp
     last_timestamp = None
-    latest_file = None
-    if os.path.exists(shard_dir):
-        for root, dirs, files in os.walk(shard_dir):
-            for file in sorted(files, reverse=True):
-                if file.endswith('.json'):
-                    latest_file = os.path.join(root, file)
-                    with open(latest_file, 'r') as f:
-                        existing_candles = json.load(f)
-                    if existing_candles:
-                        last_timestamp = existing_candles[-1]['timestamp']
-                    break
-            if last_timestamp:
-                break
+    file_path = os.path.join(data_dir, exchange.id, f"{base_filename}.json")
+    
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as f:
+            existing_candles = json.load(f)
+            if existing_candles:
+                last_timestamp = existing_candles[-1]['timestamp']
 
     if last_timestamp:
         print(f"Last recorded candle timestamp: {last_timestamp} (ms)")
-
+    else:
+        last_timestamp = exchange.parse8601('2021-01-01T00:00:00Z')
+    
     # Fetch candles from the exchange
-    since = last_timestamp + 1 if last_timestamp else exchange.parse8601('2021-01-01T00:00:00Z')
+    since = last_timestamp + 1
     candles = exchange.fetch_ohlcv(symbol, timeframe, since=since)
 
     if candles:
@@ -79,91 +67,42 @@ def fetch_and_save_candles(exchange, symbol, timeframe, data_dir, repo_name):
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('timestamp', inplace=True)
 
-        for name, group in df.groupby([df.index.year, df.index.month]):
-            year, month = name
-            shard_filename = f"{exchange.id}_{symbol.replace('/', '-')}_{timeframe}_{year}-{month:02d}.json"
-            file_path = os.path.join(data_dir, exchange.id, symbol.replace('/', '-'), timeframe, str(year), f"{month:02d}", shard_filename)
+        # Calculate filename based on the first candle's timestamp
+        first_timestamp = df.index[0]
+        year = first_timestamp.year
+        month = first_timestamp.month
+        file_path = os.path.join(data_dir, exchange.id, f"{base_filename}_{year}-{month:02d}.json")
 
-            if not os.path.exists(os.path.dirname(file_path)):
-                os.makedirs(os.path.dirname(file_path))
-            
-            save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name)
+        save_and_commit_changes(file_path, df)
 
-def extract_timestamp(x):
-    if isinstance(x, int):
-        return x
-
-    return x.timestamp()
-
-@backoff.on_exception(backoff.expo, GithubException, max_tries=7, giveup=lambda e: e.status != 409)
-def save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name):
-    combined_df = group
-
+def save_and_commit_changes(file_path, df):
     # Convert the DataFrame index (Timestamp) to milliseconds since epoch
-    combined_df.reset_index(inplace=True)
-    combined_df['timestamp'] = combined_df['timestamp'].apply(lambda x: int(extract_timestamp(x) * 1000))
-    combined_candles = combined_df.to_dict('records')
+    df.reset_index(inplace=True)
+    df['timestamp'] = df['timestamp'].apply(lambda x: int(x.timestamp() * 1000))
+    combined_candles = df.to_dict('records')
 
-    # Save the data to a temporary location first
-    temp_file_path = f"{file_path}.temp"
-    with open(temp_file_path, 'w') as f:
-        json.dump(combined_candles, f, indent=4)  # Added indent=4 for pretty printing
+    # Write the data directly to the file
+    with open(file_path, 'w') as f:
+        json.dump(combined_candles, f, indent=4)
 
-    repo = get_github_repo(repo_name)
-
-    # Check if the file exists on GitHub and compare the content
-    try:
-        contents = repo.get_contents(file_path)
-        existing_content = contents.decoded_content.decode('utf-8')
-
-        with open(temp_file_path, 'r') as f:
-            new_content = f.read()
-
-        if existing_content == new_content:
-            print(f"No changes detected for {file_path}. Skipping update.")
-            os.remove(temp_file_path)
-            return
-
-        repo.update_file(contents.path, f"Update {symbol} {timeframe} candles for {year}-{month:02d}", new_content, contents.sha)
-        print(f"Updated {file_path} on GitHub.")
-    except GithubException as e:
-        if e.status == 404:
-            with open(temp_file_path, 'r') as f:
-                new_content = f.read()
-            repo.create_file(file_path, f"Add {symbol} {timeframe} candles for {year}-{month:02d}", new_content)
-            print(f"Created {file_path} on GitHub.")
-        else:
-            raise
-
-    # Save the new content locally
-    os.rename(temp_file_path, file_path)
-
-def update_github_file(repo, file_path, symbol, timeframe, year, month):
-    with open(file_path, 'r') as f:
-        content = f.read()
-
-    # Try to get the file contents to check if it exists
-    try:
-        contents = repo.get_contents(file_path)
-        repo.update_file(contents.path, f"Update {symbol} {timeframe} candles for {year}-{month:02d}", content, contents.sha)
-    except GithubException as e:
-        if e.status != 404:
-            raise
-
-        # If the file does not exist, create it
-        repo.create_file(file_path, f"Add {symbol} {timeframe} candles for {year}-{month:02d}", content)
+    # Check if there are any changes in the file using git diff
+    result = subprocess.run(['git', 'diff', '--exit-code', file_path], capture_output=True)
+    if result.returncode != 0:
+        # There are changes, so commit and push
+        subprocess.run(['git', 'add', file_path])
+        subprocess.run(['git', 'commit', '-m', f"Update {os.path.basename(file_path)}"])
+        subprocess.run(['git', 'push'])
+        print(f"Changes detected and committed for {file_path}.")
+    else:
+        print(f"No changes detected for {file_path}. Skipping commit.")
 
 def main(argv):
     exchange = getattr(ccxt, FLAGS.exchange)()
     symbol = FLAGS.symbol
     timeframe = FLAGS.timeframe
     data_dir = FLAGS.data_dir
-    repo_name = FLAGS.repo_name
 
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
-
-    fetch_and_save_candles(exchange, symbol, timeframe, data_dir, repo_name)
+    fetch_and_save_candles(exchange, symbol, timeframe, data_dir)
 
 if __name__ == "__main__":
     app.run(main)
