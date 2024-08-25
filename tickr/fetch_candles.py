@@ -63,7 +63,7 @@ def fetch_and_save_candles(exchange, symbol, timeframe, data_dir, repo_name):
         print(f"Last recorded candle timestamp: {last_timestamp} (ms)")
 
     # Fetch candles from the exchange
-    since = last_timestamp + 1 if last_timestamp else exchange.parse8601('2021-01-01T00:00:00Z')
+    since = (last_timestamp // 1000) + 1 if last_timestamp else exchange.parse8601('2021-01-01T00:00:00Z')
     candles = exchange.fetch_ohlcv(symbol, timeframe, since=since)
 
     if candles:
