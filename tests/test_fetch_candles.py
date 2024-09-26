@@ -7,7 +7,9 @@ from tickr.fetch_candles import (
     fetch_and_save_candles,
     get_last_timestamp,
     save_and_update_github,
-    get_github_repo
+    get_github_repo,
+    extract_timestamp,
+    validate_candles
 )
 
 class TestFetchCandles(unittest.TestCase):
@@ -17,6 +19,13 @@ class TestFetchCandles(unittest.TestCase):
         mock_exchange = MagicMock()
         mock_exchange.id = id
         mock_exchange.timeframes = timeframes or {'1m': '1 minute', '1h': '1 hour'}
+        mock_exchange.parse_timeframe.side_effect = lambda tf: {
+            '1m': 60,
+            '1h': 3600
+        }[tf]
+        mock_exchange.milliseconds.return_value = int(datetime(2021, 1, 5, tzinfo=timezone.utc).timestamp() * 1000)
+        mock_exchange.iso8601.side_effect = lambda ts: datetime.utcfromtimestamp(ts / 1000).strftime('%Y-%m-%dT%H:%M:%SZ')
+        mock_exchange.parse8601.side_effect = lambda s: int(datetime.strptime(s, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc).timestamp() * 1000)
         return mock_exchange
 
     @patch('tickr.fetch_candles.get_github_repo')
@@ -28,9 +37,12 @@ class TestFetchCandles(unittest.TestCase):
         mock_exchange = mock_exchange_class.return_value
         mock_exchange.id = 'kraken'
         mock_exchange.timeframes = {'1m': '1 minute'}
-        mock_exchange.fetch_ohlcv.return_value = [
-            [1609459200000, 29000, 29500, 28800, 29400, 1000],
-            [1609545600000, 29400, 29700, 29200, 29500, 1200]
+        mock_exchange.fetch_ohlcv.side_effect = [
+            [
+                [1609459200000, 29000, 29500, 28800, 29400, 1000],
+                [1609459260000, 29400, 29700, 29200, 29500, 1200],
+            ],
+            []
         ]
         mock_repo = MagicMock()
         mock_get_repo.return_value = mock_repo
@@ -39,6 +51,7 @@ class TestFetchCandles(unittest.TestCase):
         fetch_and_save_candles(mock_exchange, 'BTC/USD', '1m', 'data', 'syncsoftco/tickr')
 
         # Assert
+        self.assertEqual(mock_exchange.fetch_ohlcv.call_count, 2)
         mock_save_and_update.assert_called_once()
         args, kwargs = mock_save_and_update.call_args
         self.assertIn('kraken_BTC-USD_1m_2021-01.json', args[0])
@@ -118,9 +131,10 @@ class TestFetchCandles(unittest.TestCase):
         year = 2021
         month = 1
         repo_name = 'syncsoftco/tickr'
+        exchange = self.create_mock_exchange()
         # Act
         with patch('json.dumps', return_value='{}'):
-            save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name)
+            save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name, exchange)
         # Assert
         mock_repo.create_file.assert_called_once()
         args, kwargs = mock_repo.create_file.call_args
@@ -152,9 +166,10 @@ class TestFetchCandles(unittest.TestCase):
         year = 2021
         month = 1
         repo_name = 'syncsoftco/tickr'
+        exchange = self.create_mock_exchange()
         # Act
         with patch('json.dumps', return_value='[{"timestamp":1609545600000}]'):
-            save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name)
+            save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name, exchange)
         # Assert
         mock_repo.update_file.assert_called_once()
         args, kwargs = mock_repo.update_file.call_args
@@ -186,9 +201,10 @@ class TestFetchCandles(unittest.TestCase):
         year = 2021
         month = 1
         repo_name = 'syncsoftco/tickr'
+        exchange = self.create_mock_exchange()
         # Act
         with patch('json.dumps', return_value='[{"timestamp":1609459200000}]'):
-            save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name)
+            save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name, exchange)
         # Assert
         mock_repo.update_file.assert_not_called()
         mock_repo.create_file.assert_not_called()
@@ -196,7 +212,6 @@ class TestFetchCandles(unittest.TestCase):
     def test_extract_timestamp_with_int(self):
         """Test extract_timestamp with integer input."""
         # Arrange
-        from tickr.fetch_candles import extract_timestamp
         timestamp_int = 1609459200000
         # Act
         result = extract_timestamp(timestamp_int)
@@ -206,12 +221,11 @@ class TestFetchCandles(unittest.TestCase):
     def test_extract_timestamp_with_datetime(self):
         """Test extract_timestamp with datetime input."""
         # Arrange
-        from tickr.fetch_candles import extract_timestamp
         timestamp_dt = datetime(2021, 1, 1, tzinfo=timezone.utc)
         # Act
         result = extract_timestamp(timestamp_dt)
         # Assert
-        self.assertEqual(result, timestamp_dt.timestamp())
+        self.assertEqual(result, int(timestamp_dt.timestamp() * 1000))
 
     @patch('tickr.fetch_candles.os.getenv', return_value=None)
     def test_get_github_repo_no_token(self, mock_getenv):
@@ -248,11 +262,11 @@ class TestFetchCandles(unittest.TestCase):
         with patch('tickr.fetch_candles.save_and_update_github'):
             fetch_and_save_candles(mock_exchange, 'BTC/USD', '1m', 'data', 'syncsoftco/tickr')
         # Assert
-        mock_exchange.fetch_ohlcv.assert_called_once()
         args, kwargs = mock_exchange.fetch_ohlcv.call_args
         candles = mock_exchange.fetch_ohlcv.return_value
         # Ensure that only past candles are processed
-        self.assertLess(candles[-1][0], int(datetime.utcnow().timestamp() * 1000))
+        current_time_ms = int(datetime(2021, 1, 3, tzinfo=timezone.utc).timestamp() * 1000)
+        self.assertTrue(all(candle[0] < current_time_ms for candle in candles))
 
     @patch('tickr.fetch_candles.get_github_repo')
     @patch('tickr.fetch_candles.os.path.exists', return_value=True)
@@ -285,16 +299,18 @@ class TestFetchCandles(unittest.TestCase):
                 'volume': 1100
             }
         ])
+        group.set_index('timestamp', inplace=True)
         symbol = 'BTC/USD'
         timeframe = '1m'
         year = 2021
         month = 1
         repo_name = 'syncsoftco/tickr'
+        exchange = self.create_mock_exchange()
 
         # Act
         with patch('json.dumps') as mock_json_dumps:
             mock_json_dumps.return_value = '[{"timestamp":1609459200000,"open":29000},{"timestamp":1609545600000,"open":29500}]'
-            save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name)
+            save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name, exchange)
 
         # Assert
         mock_repo.update_file.assert_called_once()
@@ -304,34 +320,6 @@ class TestFetchCandles(unittest.TestCase):
         candles = json.loads(updated_content)
         timestamps = [candle['timestamp'] for candle in candles]
         self.assertEqual(len(timestamps), len(set(timestamps)))
-
-    @patch('tickr.fetch_candles.get_github_repo')
-    @patch('tickr.fetch_candles.os.path.exists', return_value=True)
-    @patch('builtins.open', new_callable=mock_open, read_data='[{"timestamp":1609459200000}]')
-    def test_handle_github_exception(self, mock_open_file, mock_exists, mock_get_repo):
-        """Test that a GithubException is raised when an unexpected error occurs."""
-        # Arrange
-        from github import GithubException
-        mock_repo = MagicMock()
-        mock_get_repo.return_value = mock_repo
-        mock_repo.get_contents.side_effect = GithubException(500, 'Server Error')
-        file_path = 'data/kraken/BTC-USD/1m/2021/01/kraken_BTC-USD_1m_2021-01.json'
-        group = pd.DataFrame([{
-            'timestamp': pd.Timestamp('2021-01-01T00:00:00Z', tz=timezone.utc),
-            'open': 29000,
-            'high': 29500,
-            'low': 28800,
-            'close': 29400,
-            'volume': 1000
-        }])
-        symbol = 'BTC/USD'
-        timeframe = '1m'
-        year = 2021
-        month = 1
-        repo_name = 'syncsoftco/tickr'
-        # Act & Assert
-        with self.assertRaises(GithubException):
-            save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name)
 
     @patch('tickr.fetch_candles.get_github_repo')
     @patch('tickr.fetch_candles.os.path.exists', return_value=True)
@@ -359,10 +347,11 @@ class TestFetchCandles(unittest.TestCase):
         year = 2021
         month = 1
         repo_name = 'syncsoftco/tickr'
+        exchange = self.create_mock_exchange()
 
         # Act
         with patch('json.dumps', return_value='[{"timestamp":1609545600000}]'):
-            save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name)
+            save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name, exchange)
 
         # Assert
         mock_repo.update_file.assert_called_once()
@@ -387,8 +376,8 @@ class TestFetchCandles(unittest.TestCase):
                 fetch_and_save_candles(mock_exchange, 'BTC/USD', '1m', 'data', 'syncsoftco/tickr')
 
         # Assert
-        expected_since = 1609545600001  # last_timestamp + 1
-        mock_exchange.fetch_ohlcv.assert_called_once_with('BTC/USD', '1m', since=expected_since)
+        expected_since = 1609545600000  # last_timestamp
+        mock_exchange.fetch_ohlcv.assert_called_once_with('BTC/USD', '1m', since=expected_since, limit=1000)
 
     @patch('tickr.fetch_candles.datetime')
     def test_fetch_and_save_candles_timezone_aware(self, mock_datetime):
@@ -408,10 +397,39 @@ class TestFetchCandles(unittest.TestCase):
         mock_exchange.fetch_ohlcv.assert_called_once()
         df_call_args = mock_exchange.fetch_ohlcv.return_value
         timestamps = [candle[0] for candle in df_call_args]
-        # Ensure that timestamps are timezone-aware and in UTC
+        # Ensure that timestamps are timezone-naive (in UTC)
         self.assertTrue(all(datetime.utcfromtimestamp(ts / 1000).tzinfo is None for ts in timestamps))
 
-    # Add more test cases as needed to cover other aspects
+    @patch('tickr.fetch_candles.get_github_repo')
+    @patch('tickr.fetch_candles.os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data='[{"timestamp":1609459200000}]')
+    def test_handle_github_exception(self, mock_open_file, mock_exists, mock_get_repo):
+        """Test that a GithubException is raised when an unexpected error occurs."""
+        # Arrange
+        from github import GithubException
+        mock_repo = MagicMock()
+        mock_get_repo.return_value = mock_repo
+        mock_repo.get_contents.side_effect = GithubException(500, 'Server Error')
+        file_path = 'data/kraken/BTC-USD/1m/2021/01/kraken_BTC-USD_1m_2021-01.json'
+        group = pd.DataFrame([{
+            'timestamp': pd.Timestamp('2021-01-01T00:00:00Z', tz=timezone.utc),
+            'open': 29000,
+            'high': 29500,
+            'low': 28800,
+            'close': 29400,
+            'volume': 1000
+        }])
+        symbol = 'BTC/USD'
+        timeframe = '1m'
+        year = 2021
+        month = 1
+        repo_name = 'syncsoftco/tickr'
+        exchange = self.create_mock_exchange()
+        # Act & Assert
+        with self.assertRaises(GithubException):
+            save_and_update_github(file_path, group, symbol, timeframe, year, month, repo_name, exchange)
+
+    # Additional test cases can be added here to cover other aspects
 
 if __name__ == '__main__':
     unittest.main()
