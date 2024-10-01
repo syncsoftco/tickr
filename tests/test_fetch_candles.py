@@ -8,7 +8,7 @@ import json
 
 class TestFetchCandles(unittest.TestCase):
 
-    @patch('fetch_candles.ccxt')
+    @patch('tickr.fetch_candles.ccxt')
     def test_initialize_exchange_success(self, mock_ccxt):
         mock_exchange_class = MagicMock()
         mock_exchange = MagicMock()
@@ -23,7 +23,7 @@ class TestFetchCandles(unittest.TestCase):
         with self.assertRaises(ValueError):
             initialize_exchange('nonexistent_exchange')
 
-    @patch('fetch_candles.ccxt')
+    @patch('tickr.fetch_candles.ccxt')
     def test_initialize_exchange_no_fetch_ohlcv(self, mock_ccxt):
         mock_exchange_class = MagicMock()
         mock_exchange = MagicMock()
@@ -34,7 +34,7 @@ class TestFetchCandles(unittest.TestCase):
         with self.assertRaises(ValueError):
             initialize_exchange('test_exchange')
 
-    @patch('fetch_candles.ccxt.Exchange')
+    @patch('tickr.fetch_candles.ccxt.Exchange')
     def test_candle_fetcher_fetch_and_save_candles(self, mock_exchange_class):
         # Set up mock exchange
         mock_exchange = MagicMock()
