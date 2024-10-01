@@ -28,7 +28,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install .
 
-    - name: Fetch and update candles
+    - name: Set up Git
+      run: |
+        git config user.name "GitHub Action"
+        git config user.email "action@github.com"
+
+    - name: Fetch candles
       uses: nick-fields/retry@v2
       with:
         timeout_minutes: 10
@@ -39,12 +44,7 @@ jobs:
             --symbol=${{ matrix.symbol }} \
             --data_directory=data
 
-    - name: Set up Git
-      run: |
-        git config user.name "GitHub Action"
-        git config user.email "action@github.com"
-
-    - name: Commit Changes
+    - name: Save Candles
       run: |
         git add hubitat_lock_manager/version.py
         git commit -m "chore: Update candles. | Exchange: ${{ matrix.exchange }} | Symbol: =${{ matrix.symbol }}"
