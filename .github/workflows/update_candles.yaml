@@ -2,7 +2,7 @@ name: Update Candles
 
 on:
   schedule:
-    - cron: '*/15 * * * *'  # Runs every 15 minutes
+    - cron: '*/5 * * * *'  # Runs every 5 minutes
   workflow_dispatch:  # Allows manual triggering of the workflow
 
 jobs:
@@ -11,7 +11,6 @@ jobs:
       matrix:
         exchange: ["binanceus", "coinbase", "gemini", "kraken"]
         symbol: ["BTC/USD", "ETH/USD"]
-        timeframe: ['1m', '5m', '15m', '30m', '1h', '1d']
 
     runs-on: ubuntu-latest
 
@@ -40,4 +39,15 @@ jobs:
           python -m tickr.fetch_candles \
             --exchange=${{ matrix.exchange }} \
             --symbol=${{ matrix.symbol }} \
-            --timeframe=${{ matrix.timeframe }}
+            --data_directory=data
+
+    - name: Set up Git
+      run: |
+        git config user.name "GitHub Action"
+        git config user.email "action@github.com"
+
+    - name: Commit Changes
+      run: |
+        git add hubitat_lock_manager/version.py
+        git commit -m "chore: Update candles. | Exchange: ${{ matrix.exchange }} | Symbol: =${{ matrix.symbol }}"
+        git push origin main
