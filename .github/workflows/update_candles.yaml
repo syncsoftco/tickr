@@ -40,3 +40,14 @@ jobs:
             --exchange=${{ matrix.exchange }} \
             --symbol=${{ matrix.symbol }} \
             --data_directory=data
+
+    - name: Set up Git
+      run: |
+        git config user.name "GitHub Action"
+        git config user.email "action@github.com"
+
+    - name: Commit Changes
+      run: |
+        git add hubitat_lock_manager/version.py
+        git commit -m "chore: Update candles. | Exchange: ${{ matrix.exchange }} | Symbol: =${{ matrix.symbol }}"
+        git push origin main
