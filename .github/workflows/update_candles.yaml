@@ -2,7 +2,7 @@ name: Update Candles
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # Runs every 15 minutes
+    - cron: '*/5 * * * *'  # Runs every 5 minutes
   workflow_dispatch:  # Allows manual triggering of the workflow
 
 jobs:
