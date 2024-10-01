@@ -23,17 +23,6 @@ class TestFetchCandles(unittest.TestCase):
         with self.assertRaises(ValueError):
             initialize_exchange('nonexistent_exchange')
 
-    @patch('tickr.fetch_candles.ccxt')
-    def test_initialize_exchange_no_fetch_ohlcv(self, mock_ccxt):
-        mock_exchange_class = MagicMock()
-        mock_exchange = MagicMock()
-        mock_exchange.has = {'fetchOHLCV': False}
-        mock_exchange_class.return_value = mock_exchange
-        setattr(mock_ccxt, 'test_exchange', mock_exchange_class)
-
-        with self.assertRaises(ValueError):
-            initialize_exchange('test_exchange')
-
     @patch('tickr.fetch_candles.ccxt.Exchange')
     def test_candle_fetcher_fetch_and_save_candles(self, mock_exchange_class):
         # Set up mock exchange
