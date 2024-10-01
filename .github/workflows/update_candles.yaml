@@ -30,8 +30,6 @@ jobs:
 
     - name: Fetch and update candles
       uses: nick-fields/retry@v2
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token for authentication
       with:
         timeout_minutes: 10
         max_attempts: 3
