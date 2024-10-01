@@ -46,6 +46,11 @@ jobs:
 
     - name: Save Candles
       run: |
-        git add hubitat_lock_manager/version.py
-        git commit -m "chore: Update candles. | Exchange: ${{ matrix.exchange }} | Symbol: =${{ matrix.symbol }}"
-        git push origin main
+        git add data/*
+        if [ -n "$(git status --porcelain)" ]; then
+          git commit -m "chore(candles): Updated candle data for ${{ matrix.symbol }} on ${{ matrix.exchange }}. Frequency: 1m"
+          git push origin main
+        else
+          echo "No changes to commit"
+        fi
+
