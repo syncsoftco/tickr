@@ -37,11 +37,9 @@ def main(_):
 
 def initialize_exchange(exchange_name: str) -> ccxt.Exchange:
     try:
-        exchange_class = getattr(ccxt, exchange_name)
+        return getattr(ccxt, exchange_name)
     except AttributeError:
         raise ValueError(f'Exchange "{exchange_name}" not found in ccxt library.')
-
-    return exchange
 
 class CandleFetcher:
     def __init__(self, exchange: ccxt.Exchange, symbol: str, data_directory: str, timeframe: str = '1m'):
