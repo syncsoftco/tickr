@@ -50,23 +50,13 @@ jobs:
           done
         done
 
-    - name: Stage changes
+    - name: Save changes
       run: |
         # Stage all changes in the data directory
         git add data/*
 
-    - name: Commit changes
-      run: |
-        # Check if there are any changes to commit
-        if git diff --cached --quiet; then
-          echo "No changes to commit"
-        else
-          # Commit the changes with a descriptive message
-          git commit -m "chore(candles): Updated candle data for all exchanges and symbols. Frequency: 1m"
-        fi
-
-    - name: Push changes
-      if: success() && steps.commit-changes.outputs.changes_committed == 'true'
-      run: |
+        # Commit the changes with a descriptive message
+        git commit -a -m "chore(candles): Updated candle data for all exchanges and symbols. Frequency: 1m"
+      
         # Push the commit to the main branch
         git push origin main
