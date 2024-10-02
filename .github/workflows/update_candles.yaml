@@ -42,18 +42,15 @@ jobs:
         timeout_minutes: 10
         max_attempts: 3
         command: |
+          git pull
+
           python -m tickr.fetch_candles \
             --exchange=${{ matrix.exchange }} \
             --symbol=${{ matrix.symbol }} \
             --data_directory=${DATA_DIR}
 
-    - name: Save candles
-      uses: nick-fields/retry@v2
-      with:
-        timeout_minutes: 10
-        max_attempts: 5
-        command: |
           git add ${DATA_DIR}/*
+
           if [ -n "$(git status --porcelain)" ]; then
             git pull
             git commit -m "chore(candles): Updated candle data for ${{ matrix.symbol }} on ${{ matrix.exchange }}. Frequency: 1m"
