@@ -8,7 +8,7 @@ import json
 
 class TestFetchCandles(unittest.TestCase):
 
-    @patch('tickr.fetch_candles.ccxt')
+    @patch('fetch_candles.ccxt')
     def test_initialize_exchange_success(self, mock_ccxt):
         mock_exchange_class = MagicMock()
         mock_exchange = MagicMock()
@@ -23,7 +23,7 @@ class TestFetchCandles(unittest.TestCase):
         with self.assertRaises(ValueError):
             initialize_exchange('nonexistent_exchange')
 
-    @patch('tickr.fetch_candles.ccxt.Exchange')
+    @patch('fetch_candles.ccxt.Exchange')
     def test_candle_fetcher_fetch_and_save_candles(self, mock_exchange_class):
         # Set up mock exchange
         mock_exchange = MagicMock()
@@ -63,11 +63,13 @@ class TestFetchCandles(unittest.TestCase):
         mock_exchange.parse_timeframe = MagicMock(return_value=1)
         mock_exchange.options = {'fetchOHLCVLimit': 1000}
         mock_exchange.milliseconds = MagicMock(return_value=1609549200000)
+        mock_exchange.load_markets = MagicMock()
 
         with tempfile.TemporaryDirectory() as data_directory:
             candle_fetcher = CandleFetcher(mock_exchange, 'BTC/USDT', data_directory)
             since = candle_fetcher.get_since_timestamp()
-            self.assertEqual(since, 0)
+            expected_since = int((datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=365)).timestamp() * 1000)
+            self.assertAlmostEqual(since, expected_since, delta=1000)  # Allow slight timing differences
 
     def test_candle_fetcher_get_since_timestamp_with_existing_file(self):
         mock_exchange = MagicMock()
@@ -95,7 +97,8 @@ class TestFetchCandles(unittest.TestCase):
 
             candle_fetcher = CandleFetcher(mock_exchange, 'BTC/USDT', data_directory)
             since = candle_fetcher.get_since_timestamp()
-            expected_since = int(datetime.datetime(2021, 1, 1).timestamp() * 1000)
+            latest_date = datetime.datetime.strptime('2021-01-01', '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc)
+            expected_since = int(latest_date.timestamp() * 1000)
             self.assertEqual(since, expected_since)
 
     def test_get_since_timestamp_with_multiple_symbols(self):
