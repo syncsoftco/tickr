@@ -33,7 +33,7 @@ jobs:
         git config user.name "GitHub Action"
         git config user.email "action@github.com"
 
-    - name: Set env
+    - name: Set data directory
       run: echo "DATA_DIR=data/${{ matrix.exchange }}" >> $GITHUB_ENV
 
     - name: Fetch candles
