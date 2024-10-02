@@ -56,5 +56,5 @@ jobs:
           git add ${DATA_DIR}/*
           git commit -a -m "chore(candles): Updated candle data for ${{ matrix.symbol }} on ${{ matrix.exchange }}. Frequency: 1m"
 
-          git pull
+          git pull --rebase
           git push origin main
