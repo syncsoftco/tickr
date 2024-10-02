@@ -7,6 +7,11 @@ on:
 
 jobs:
   update-candles:
+    strategy:
+      matrix:
+        exchange: ["binanceus", "coinbase", "gemini", "kraken"]
+        symbol: ["BTC/USD", "ETH/USD"]
+
     runs-on: ubuntu-latest
 
     steps:
@@ -28,35 +33,28 @@ jobs:
         git config user.name "GitHub Action"
         git config user.email "action@github.com"
 
-    - name: Fetch candles serially
-      run: |
-        # Define arrays of exchanges and symbols
-        exchanges=("binanceus" "coinbase" "gemini" "kraken")
-        symbols=("BTC/USD" "ETH/USD")
+    - name: Set data directory
+      run: echo "DATA_DIR=data/${{ matrix.exchange }}" >> $GITHUB_ENV
 
-        # Loop over each exchange and symbol combination
-        for exchange in "${exchanges[@]}"; do
-          for symbol in "${symbols[@]}"; do
-            echo "Processing $symbol on $exchange"
+    - name: Fetch candles
+      uses: nick-fields/retry@v2
+      with:
+        timeout_minutes: 10
+        max_attempts: 3
+        command: |
+          python -m tickr.fetch_candles \
+            --exchange=${{ matrix.exchange }} \
+            --symbol=${{ matrix.symbol }} \
+            --data_directory=${DATA_DIR}
 
-            # Set data directory
-            DATA_DIR="data/$exchange"
+    - name: Save candles
+      uses: nick-fields/retry@v2
+      with:
+        timeout_minutes: 10
+        max_attempts: 5
+        command: |
+          git add ${DATA_DIR}/*
+          git commit -a -m "chore(candles): Updated candle data for ${{ matrix.symbol }} on ${{ matrix.exchange }}. Frequency: 1m"
 
-            # Fetch candle data
-            python -m tickr.fetch_candles \
-              --exchange="$exchange" \
-              --symbol="$symbol" \
-              --data_directory="$DATA_DIR"
-          done
-        done
-
-    - name: Save changes
-      run: |
-        # Stage all changes in the data directory
-        git add data/*
-
-        # Commit the changes with a descriptive message
-        git commit -a -m "chore(candles): Updated candle data for all exchanges and symbols. Frequency: 1m"
-      
-        # Push the commit to the main branch
-        git push origin main
+          git pull
+          git push origin main
