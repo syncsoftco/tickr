@@ -41,7 +41,11 @@ def initialize_exchange(exchange_name: str) -> ccxt.Exchange:
     except AttributeError:
         raise ValueError(f'Exchange "{exchange_name}" not found in ccxt library.')
 
-    return exchange_class()
+    exchange = exchange_class()
+    if not exchange.has.get('fetchOHLCV', False):
+        raise ValueError(f'Exchange "{exchange_name}" does not support fetching OHLCV data.')
+
+    return exchange
 
 class CandleFetcher:
     def __init__(self, exchange: ccxt.Exchange, symbol: str, data_directory: str, timeframe: str = '1m'):
@@ -70,8 +74,10 @@ class CandleFetcher:
             f for f in os.listdir(self.data_directory) if f.startswith(prefix)
         )
         if not existing_files:
-            # Start from the earliest timestamp available
-            return 0
+            # Start from one year ago
+            one_year_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=365)
+            since = int(one_year_ago.timestamp() * 1000)
+            return since
 
         latest_file = existing_files[-1]
         latest_file_path = os.path.join(self.data_directory, latest_file)
@@ -82,17 +88,17 @@ class CandleFetcher:
                 last_line = lines[-1]
                 last_candle = json.loads(last_line)
                 return last_candle[0] + 1  # Continue from the last timestamp
-            
+
             # Empty file, use the date from filename
             latest_date_str = latest_file[len(prefix):-5]  # Remove prefix and '.json'
-            latest_date = datetime.datetime.strptime(latest_date_str, '%Y-%m-%d')
+            latest_date = datetime.datetime.strptime(latest_date_str, '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc)
             return int(latest_date.timestamp() * 1000)
 
     def process_candles(self, candles: List[List[int]]):
         daily_candles = {}
         for candle in candles:
             timestamp = candle[0]
-            date_str = datetime.datetime.utcfromtimestamp(timestamp / 1000).strftime('%Y-%m-%d')
+            date_str = datetime.datetime.fromtimestamp(timestamp / 1000, tz=datetime.timezone.utc).strftime('%Y-%m-%d')
             if date_str not in daily_candles:
                 daily_candles[date_str] = []
             daily_candles[date_str].append(candle)
