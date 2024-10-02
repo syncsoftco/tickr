@@ -9,7 +9,7 @@ jobs:
   update-candles:
     strategy:
       matrix:
-        exchange: ["binanceus", "coinbase", "gemini", "kraken"]
+        exchange: ["coinbase", "gemini", "kraken"]
         symbol: ["BTC/USD", "ETH/USD"]
 
     runs-on: ubuntu-latest
