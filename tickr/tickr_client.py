@@ -16,7 +16,7 @@ import base64
 import io
 
 
-class TickerClient:
+class TickrClient:
     def __init__(self, github_token: str, repo_name: str, data_directory: str, symbol: str):
         self.github = Github(github_token)
         self.repo_name = repo_name
