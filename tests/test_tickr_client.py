@@ -272,7 +272,7 @@ class TestTickrClientMain(absltest.TestCase):
             'tickr_client.py',
             '--github_token=fake_token',
             '--exchange=binance',
-            '--symbol=BTC/USD',
+            '--trade_symbol=BTC/USD',
             '--timeframe=1m',
         ]
 
@@ -315,7 +315,7 @@ class TestTickrClientMain(absltest.TestCase):
             'tickr_client.py',
             '--github_token=fake_token',
             '--exchange=binance',
-            '--symbol=BTC/USD',
+            '--trade_symbol=BTC/USD',
             '--start_timestamp=1677628800000',
             '--end_timestamp=1677715199000',
             '--timeframe=1m',
