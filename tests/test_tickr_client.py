@@ -50,7 +50,7 @@ class TestTickrClient(unittest.TestCase):
                 content.encode('utf-8')
             ).decode('utf-8')
 
-    @patch('TickrClient.Github')
+    @patch('tickr.tickr_client.Github')
     def test_start_timestamp_not_specified(self, mock_github):
         # Arrange
         sut = TickrClient(
