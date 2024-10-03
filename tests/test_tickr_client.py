@@ -14,6 +14,8 @@ import datetime
 import json
 from tickr.tickr_client import TickrClient, main
 from absl.testing import absltest
+from absl import app
+
 
 class TestTickrClient(unittest.TestCase):
     """Test suite for the TickrClient class."""
@@ -22,10 +24,11 @@ class TestTickrClient(unittest.TestCase):
         """Set up test fixtures."""
         # Arrange
         self.github_token = 'fake_token'
-        self.repo_name = 'user/repo'
+        self.repo_name = 'syncsoftco/tickr'  # Default repo name
         self.data_directory = 'data'
+        self.exchange = 'binance'
         self.symbol = 'BTC/USD'
-        self.prefix = f"{self.symbol.replace('/', '_')}_"
+        self.prefix = f"{self.exchange}/{self.symbol.replace('/', '_')}_"
 
         # Create sample candle data
         self.sample_dates = [
@@ -58,7 +61,7 @@ class TestTickrClient(unittest.TestCase):
         """Test that ValueError is raised when start_timestamp is None."""
         # Arrange
         sut = TickrClient(
-            self.github_token, self.repo_name, self.data_directory, self.symbol
+            self.github_token, self.repo_name, self.data_directory, self.exchange, self.symbol
         )
         start_timestamp = None
         end_timestamp = 1677715200000  # March 2, 2023 00:00:00 UTC in milliseconds
@@ -74,7 +77,7 @@ class TestTickrClient(unittest.TestCase):
         """Test that ValueError is raised when end_timestamp is None."""
         # Arrange
         sut = TickrClient(
-            self.github_token, self.repo_name, self.data_directory, self.symbol
+            self.github_token, self.repo_name, self.data_directory, self.exchange, self.symbol
         )
         start_timestamp = 1677628800000  # March 1, 2023 00:00:00 UTC
         end_timestamp = None
@@ -98,13 +101,15 @@ class TestTickrClient(unittest.TestCase):
                 raise Exception("File not found")
             else:
                 content_file = MagicMock()
-                content_file.content = self.sample_files[file_path]
+                content_file.content = self.sample_files.get(file_path, '')
+                if not content_file.content:
+                    raise Exception("File not found")
                 return content_file
 
         mock_repo.get_contents.side_effect = get_contents_side_effect
 
         sut = TickrClient(
-            self.github_token, self.repo_name, self.data_directory, self.symbol
+            self.github_token, self.repo_name, self.data_directory, self.exchange, self.symbol
         )
         # Request data from Feb 28, 2023, which we don't have
         start_timestamp = 1677542400000  # Feb 28, 2023 00:00:00 UTC
@@ -125,13 +130,15 @@ class TestTickrClient(unittest.TestCase):
 
         def get_contents_side_effect(file_path):
             content_file = MagicMock()
-            content_file.content = self.sample_files[file_path]
+            content_file.content = self.sample_files.get(file_path, '')
+            if not content_file.content:
+                raise Exception("File not found")
             return content_file
 
         mock_repo.get_contents.side_effect = get_contents_side_effect
 
         sut = TickrClient(
-            self.github_token, self.repo_name, self.data_directory, self.symbol
+            self.github_token, self.repo_name, self.data_directory, self.exchange, self.symbol
         )
         start_timestamp = 1677628800000  # March 1, 2023 00:00:00 UTC
         end_timestamp = 1677715199000  # March 1, 2023 23:59:59 UTC
@@ -152,13 +159,15 @@ class TestTickrClient(unittest.TestCase):
 
         def get_contents_side_effect(file_path):
             content_file = MagicMock()
-            content_file.content = self.sample_files[file_path]
+            content_file.content = self.sample_files.get(file_path, '')
+            if not content_file.content:
+                raise Exception("File not found")
             return content_file
 
         mock_repo.get_contents.side_effect = get_contents_side_effect
 
         sut = TickrClient(
-            self.github_token, self.repo_name, self.data_directory, self.symbol
+            self.github_token, self.repo_name, self.data_directory, self.exchange, self.symbol
         )
         start_timestamp = 1677628800000  # March 1, 2023 00:00:00 UTC
         end_timestamp = 1677715199000  # March 1, 2023 23:59:59 UTC
@@ -181,7 +190,7 @@ class TestTickrClient(unittest.TestCase):
         # Remove candles from March 1, 2023 12:00 to 12:59
         def get_contents_side_effect(file_path):
             content_file = MagicMock()
-            decoded_content = base64.b64decode(self.sample_files[file_path]).decode('utf-8')
+            decoded_content = base64.b64decode(self.sample_files.get(file_path, '')).decode('utf-8')
             lines = decoded_content.strip().split('\n')
             filtered_lines = []
             for line in lines:
@@ -190,13 +199,15 @@ class TestTickrClient(unittest.TestCase):
                 if not (1677672000000 <= ts <= 1677675599000):  # Exclude 12:00 to 12:59
                     filtered_lines.append(line)
             new_content = '\n'.join(filtered_lines)
+            if not new_content:
+                raise Exception("File not found")
             content_file.content = base64.b64encode(new_content.encode('utf-8')).decode('utf-8')
             return content_file
 
         mock_repo.get_contents.side_effect = get_contents_side_effect
 
         sut = TickrClient(
-            self.github_token, self.repo_name, self.data_directory, self.symbol
+            self.github_token, self.repo_name, self.data_directory, self.exchange, self.symbol
         )
         start_timestamp = 1677628800000  # March 1, 2023 00:00:00 UTC
         end_timestamp = 1677715199000  # March 1, 2023 23:59:59 UTC
@@ -219,13 +230,15 @@ class TestTickrClient(unittest.TestCase):
 
         def get_contents_side_effect(file_path):
             content_file = MagicMock()
-            content_file.content = self.sample_files[file_path]
+            content_file.content = self.sample_files.get(file_path, '')
+            if not content_file.content:
+                raise Exception("File not found")
             return content_file
 
         mock_repo.get_contents.side_effect = get_contents_side_effect
 
         sut = TickrClient(
-            self.github_token, self.repo_name, self.data_directory, self.symbol
+            self.github_token, self.repo_name, self.data_directory, self.exchange, self.symbol
         )
         start_timestamp = 1677628800000  # March 1, 2023 00:00:00 UTC
         end_timestamp = 1677715199000  # March 1, 2023 23:59:59 UTC
@@ -241,21 +254,68 @@ class TestTickrClientMain(absltest.TestCase):
     """Unit test for the main method in tickr_client.py."""
 
     @patch('tickr.tickr_client.TickrClient')
+    @patch('tickr.tickr_client.datetime')
     @patch('sys.exit')
-    def test_main(self, mock_sys_exit, mock_tickr_client):
-        """Test the main method to ensure it constructs the TickrClient correctly."""
+    def test_main_with_defaults(self, mock_sys_exit, mock_datetime, mock_tickr_client):
+        """Test the main method with default timestamps."""
+        # Arrange
+        # Mock datetime to return a fixed current time
+        fixed_now = datetime.datetime(2023, 3, 2, 12, 0, 0)
+        mock_datetime.datetime.utcnow.return_value = fixed_now
+
+        # Mock the TickrClient instance and its methods
+        mock_client_instance = mock_tickr_client.return_value
+        mock_client_instance.get_candles.return_value = pd.DataFrame()
+
+        # Prepare argv with flags, omitting start_timestamp and end_timestamp
+        argv = [
+            'tickr_client.py',
+            '--github_token=fake_token',
+            '--exchange=binance',
+            '--symbol=BTC/USD',
+            '--timeframe=1m',
+        ]
+
+        # Act
+        # Run the main function with mocked sys.exit to prevent exiting
+        app.run(main, argv=argv)
+
+        # Calculate expected default timestamps
+        expected_end_timestamp = int(fixed_now.timestamp() * 1000)
+        expected_start_timestamp = int((fixed_now - datetime.timedelta(minutes=315)).timestamp() * 1000)
+
+        # Assert
+        # Verify that TickrClient was called with correct parameters
+        mock_tickr_client.assert_called_with(
+            github_token='fake_token',
+            repo_name='syncsoftco/tickr',
+            data_directory='data',
+            exchange='binance',
+            symbol='BTC/USD',
+        )
+
+        # Verify that get_candles was called with computed default timestamps
+        mock_client_instance.get_candles.assert_called_with(
+            start_timestamp=expected_start_timestamp,
+            end_timestamp=expected_end_timestamp,
+            timeframe='1m',
+        )
+
+    @patch('tickr.tickr_client.TickrClient')
+    @patch('sys.exit')
+    def test_main_with_specified_timestamps(self, mock_sys_exit, mock_tickr_client):
+        """Test the main method with specified timestamps."""
         # Arrange
         # Mock the TickrClient instance and its methods
         mock_client_instance = mock_tickr_client.return_value
         mock_client_instance.get_candles.return_value = pd.DataFrame()
 
-        # Prepare argv with flags
+        # Prepare argv with flags including start_timestamp and end_timestamp
         argv = [
             'tickr_client.py',
             '--github_token=fake_token',
-            '--repo_name=user/repo',
-            '--data_directory=data',
-            '--trade_symbol=BTC/USD',
+            '--exchange=binance',
+            '--symbol=BTC/USD',
             '--start_timestamp=1677628800000',
             '--end_timestamp=1677715199000',
             '--timeframe=1m',
@@ -263,19 +323,19 @@ class TestTickrClientMain(absltest.TestCase):
 
         # Act
         # Run the main function with mocked sys.exit to prevent exiting
-        from absl import app
         app.run(main, argv=argv)
 
         # Assert
         # Verify that TickrClient was called with correct parameters
         mock_tickr_client.assert_called_with(
             github_token='fake_token',
-            repo_name='user/repo',
+            repo_name='syncsoftco/tickr',
             data_directory='data',
+            exchange='binance',
             symbol='BTC/USD',
         )
 
-        # Verify that get_candles was called with correct parameters
+        # Verify that get_candles was called with specified timestamps
         mock_client_instance.get_candles.assert_called_with(
             start_timestamp=1677628800000,
             end_timestamp=1677715199000,
