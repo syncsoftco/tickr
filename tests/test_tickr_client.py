@@ -11,7 +11,7 @@ from unittest.mock import patch, MagicMock
 import pandas as pd
 import datetime
 import json
-from tickr_client import TickrClient
+from tickr.tickr_client import TickrClient
 
 
 class TestTickrClient(unittest.TestCase):
