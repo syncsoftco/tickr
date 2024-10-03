@@ -53,7 +53,7 @@ class TestTickrClient(unittest.TestCase):
     @patch('TickrClient.Github')
     def test_start_timestamp_not_specified(self, mock_github):
         # Arrange
-        sut = CandleReader(
+        sut = TickrClient(
             self.github_token, self.repo_name, self.data_directory, self.symbol
         )
         start_timestamp = None
@@ -68,7 +68,7 @@ class TestTickrClient(unittest.TestCase):
     @patch('tickr.tickr_client.Github')
     def test_end_timestamp_not_specified(self, mock_github):
         # Arrange
-        sut = CandleReader(
+        sut = TickrClient(
             self.github_token, self.repo_name, self.data_directory, self.symbol
         )
         start_timestamp = 1677628800000  # March 1, 2023 00:00:00 UTC
@@ -97,7 +97,7 @@ class TestTickrClient(unittest.TestCase):
 
         mock_repo.get_contents.side_effect = get_contents_side_effect
 
-        sut = CandleReader(
+        sut = TickrClient(
             self.github_token, self.repo_name, self.data_directory, self.symbol
         )
         # Request data from Feb 28, 2023, which we don't have
@@ -123,7 +123,7 @@ class TestTickrClient(unittest.TestCase):
 
         mock_repo.get_contents.side_effect = get_contents_side_effect
 
-        sut = CandleReader(
+        sut = TickrClient(
             self.github_token, self.repo_name, self.data_directory, self.symbol
         )
         start_timestamp = 1677628800000  # March 1, 2023 00:00:00 UTC
@@ -149,7 +149,7 @@ class TestTickrClient(unittest.TestCase):
 
         mock_repo.get_contents.side_effect = get_contents_side_effect
 
-        sut = CandleReader(
+        sut = TickrClient(
             self.github_token, self.repo_name, self.data_directory, self.symbol
         )
         start_timestamp = 1677628800000  # March 1, 2023 00:00:00 UTC
@@ -186,7 +186,7 @@ class TestTickrClient(unittest.TestCase):
 
         mock_repo.get_contents.side_effect = get_contents_side_effect
 
-        sut = CandleReader(
+        sut = TickrClient(
             self.github_token, self.repo_name, self.data_directory, self.symbol
         )
         start_timestamp = 1677628800000  # March 1, 2023 00:00:00 UTC
@@ -214,7 +214,7 @@ class TestTickrClient(unittest.TestCase):
 
         mock_repo.get_contents.side_effect = get_contents_side_effect
 
-        sut = CandleReader(
+        sut = TickrClient(
             self.github_token, self.repo_name, self.data_directory, self.symbol
         )
         start_timestamp = 1677628800000  # March 1, 2023 00:00:00 UTC
