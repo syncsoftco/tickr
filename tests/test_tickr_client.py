@@ -13,10 +13,14 @@ import pandas as pd
 import datetime
 import json
 from tickr.tickr_client import TickrClient
-
+from absl.testing import absltest
+from absl.testing import flagsaver
 
 class TestTickrClient(unittest.TestCase):
+    """Test suite for the TickrClient class."""
+
     def setUp(self):
+        """Set up test fixtures."""
         # Arrange
         self.github_token = 'fake_token'
         self.repo_name = 'user/repo'
@@ -52,6 +56,7 @@ class TestTickrClient(unittest.TestCase):
 
     @patch('tickr.tickr_client.Github')
     def test_start_timestamp_not_specified(self, mock_github):
+        """Test that ValueError is raised when start_timestamp is None."""
         # Arrange
         sut = TickrClient(
             self.github_token, self.repo_name, self.data_directory, self.symbol
@@ -67,6 +72,7 @@ class TestTickrClient(unittest.TestCase):
 
     @patch('tickr.tickr_client.Github')
     def test_end_timestamp_not_specified(self, mock_github):
+        """Test that ValueError is raised when end_timestamp is None."""
         # Arrange
         sut = TickrClient(
             self.github_token, self.repo_name, self.data_directory, self.symbol
@@ -82,6 +88,7 @@ class TestTickrClient(unittest.TestCase):
 
     @patch('tickr.tickr_client.Github')
     def test_data_insufficient_missing_file(self, mock_github):
+        """Test that ValueError is raised when data files are missing."""
         # Arrange
         mock_repo = MagicMock()
         mock_github.return_value.get_repo.return_value = mock_repo
@@ -112,6 +119,7 @@ class TestTickrClient(unittest.TestCase):
 
     @patch('tickr.tickr_client.Github')
     def test_data_sufficient(self, mock_github):
+        """Test that data is fetched correctly when sufficient data is available."""
         # Arrange
         mock_repo = MagicMock()
         mock_github.return_value.get_repo.return_value = mock_repo
@@ -138,6 +146,7 @@ class TestTickrClient(unittest.TestCase):
 
     @patch('tickr.tickr_client.Github')
     def test_resampling(self, mock_github):
+        """Test that data is resampled correctly for different timeframes."""
         # Arrange
         mock_repo = MagicMock()
         mock_github.return_value.get_repo.return_value = mock_repo
@@ -164,6 +173,7 @@ class TestTickrClient(unittest.TestCase):
 
     @patch('tickr.tickr_client.Github')
     def test_missing_candles(self, mock_github):
+        """Test that ValueError is raised when there are missing candles."""
         # Arrange
         # Simulate missing candles in the data
         mock_repo = MagicMock()
@@ -203,6 +213,7 @@ class TestTickrClient(unittest.TestCase):
 
     @patch('tickr.tickr_client.Github')
     def test_unsupported_timeframe(self, mock_github):
+        """Test that ValueError is raised for unsupported timeframes."""
         # Arrange
         mock_repo = MagicMock()
         mock_github.return_value.get_repo.return_value = mock_repo
@@ -225,3 +236,49 @@ class TestTickrClient(unittest.TestCase):
             sut.get_candles(start_timestamp, end_timestamp, timeframe='7m')
 
         self.assertEqual(str(context.exception), "Unsupported timeframe: 7m")
+
+
+class TestTickrClientMain(absltest.TestCase):
+    """Unit test for the main method in tickr_client.py."""
+
+    @flagsaver.flagsaver(
+        github_token='fake_token',
+        repo_name='user/repo',
+        data_directory='data',
+        symbol='BTC/USD',
+        start_timestamp=1677628800000,
+        end_timestamp=1677715199000,
+        timeframe='1m',
+    )
+    @patch('tickr.tickr_client.TickrClient')
+    def test_main(self, mock_tickr_client):
+        """Test the main method to ensure it constructs the TickrClient correctly."""
+        # Arrange
+        # Mock the TickrClient instance and its methods
+        mock_client_instance = mock_tickr_client.return_value
+        mock_client_instance.get_candles.return_value = pd.DataFrame()
+
+        # Act
+        # Call the main function
+        from tickr.tickr_client import main
+        main([])
+
+        # Assert
+        # Verify that TickrClient was called with correct parameters
+        mock_tickr_client.assert_called_with(
+            github_token='fake_token',
+            repo_name='user/repo',
+            data_directory='data',
+            symbol='BTC/USD',
+        )
+
+        # Verify that get_candles was called with correct parameters
+        mock_client_instance.get_candles.assert_called_with(
+            start_timestamp=1677628800000,
+            end_timestamp=1677715199000,
+            timeframe='1m',
+        )
+
+
+if __name__ == '__main__':
+    absltest.main()
