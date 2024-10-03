@@ -13,13 +13,13 @@ To fetch the latest 315 minutes of BTC/USD candle data:
 
     python tickr_client.py \
         --github_token="your_github_token" \
-        --symbol="BTC/USD"
+        --trade_symbol="BTC/USD"
 
 To fetch data for a specific time range and timeframe:
 
     python tickr_client.py \
         --github_token="your_github_token" \
-        --symbol="BTC/USD" \
+        --trade_symbol="BTC/USD" \
         --start_timestamp=1677628800000 \
         --end_timestamp=1677715199000 \
         --timeframe="5m"
@@ -49,10 +49,6 @@ flags.DEFINE_string('repo_data_directory', 'data', 'Directory where data files a
 flags.DEFINE_string('timeframe', '1m', 'Timeframe for candle data, e.g., "1m", "5m", "1h".')
 flags.DEFINE_integer('start_timestamp', None, 'Start timestamp in milliseconds since epoch.')
 flags.DEFINE_integer('end_timestamp', None, 'End timestamp in milliseconds since epoch.')
-
-# Mark required flags
-flags.mark_flag_as_required('github_token')
-flags.mark_flag_as_required('symbol')
 
 
 class TickrClient:
