@@ -13,14 +13,14 @@ To fetch the latest 315 minutes of BTC/USD candle data from Binance:
 
     python tickr_client.py \
         --github_token="your_github_token" \
-        --exchange="binance" \
+        --exchange_name="binance" \
         --trade_symbol="BTC/USD"
 
 To fetch data for a specific time range and timeframe from Coinbase:
 
     python tickr_client.py \
         --github_token="your_github_token" \
-        --exchange="coinbase" \
+        --exchange_name="coinbase" \
         --trade_symbol="BTC/USD" \
         --start_timestamp=1677628800000 \
         --end_timestamp=1677715199000 \
@@ -43,7 +43,7 @@ FLAGS = flags.FLAGS
 
 # Required flags (without default values)
 flags.DEFINE_string('github_token', None, 'GitHub token for authentication.')
-flags.DEFINE_string('exchange', None, 'Exchange name, e.g., "binance", "coinbase".')
+flags.DEFINE_string('exchange_name', None, 'Exchange name, e.g., "binance", "coinbase".')
 flags.DEFINE_string('trade_symbol', None, 'Symbol of the cryptocurrency, e.g., "BTC/USD".')
 
 # Optional flags (with default values)
@@ -55,7 +55,7 @@ flags.DEFINE_integer('end_timestamp', None, 'End timestamp in milliseconds since
 
 # Mark required flags
 flags.mark_flag_as_required('github_token')
-flags.mark_flag_as_required('exchange')
+flags.mark_flag_as_required('exchange_name')
 flags.mark_flag_as_required('trade_symbol')
 
 
@@ -299,7 +299,7 @@ def main(argv):
         github_token=FLAGS.github_token,
         repo_name=FLAGS.repo_name,
         data_directory=FLAGS.repo_data_directory,
-        exchange=FLAGS.exchange,
+        exchange=FLAGS.exchange_name,
         symbol=FLAGS.trade_symbol,
     )
 
