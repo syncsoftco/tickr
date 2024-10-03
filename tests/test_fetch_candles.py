@@ -50,7 +50,7 @@ class TestFetchCandles(unittest.TestCase):
             self.assertTrue(any('2021-01-02' in file for file in files))
 
             # Verify content of one of the files
-            file_path = os.path.join(data_directory, 'BTC_USDT_2021-01-01.json')
+            file_path = os.path.join(data_directory, 'BTC_USDT_2021-01-01.jsonl')
             with open(file_path, 'r') as f:
                 lines = f.readlines()
                 self.assertEqual(len(lines), 2)  # Two candles for Jan 1, 2021
@@ -76,7 +76,7 @@ class TestFetchCandles(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as data_directory:
             # Create a mock file for Jan 1, 2021 with existing data
-            file_name = os.path.join(data_directory, 'BTC_USDT_2021-01-01.json')
+            file_name = os.path.join(data_directory, 'BTC_USDT_2021-01-01.jsonl')
             existing_candle = [1609459200000, 29000, 29500, 28900, 29400, 100]
             with open(file_name, 'w') as f:
                 f.write(json.dumps(existing_candle) + '\n')
@@ -91,7 +91,7 @@ class TestFetchCandles(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as data_directory:
             # Create an empty file for Jan 1, 2021
-            file_name = os.path.join(data_directory, 'BTC_USDT_2021-01-01.json')
+            file_name = os.path.join(data_directory, 'BTC_USDT_2021-01-01.jsonl')
             with open(file_name, 'w') as f:
                 pass  # Create an empty file
 
@@ -106,10 +106,10 @@ class TestFetchCandles(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as data_directory:
             # Create files for different symbols
-            with open(os.path.join(data_directory, 'BTC_USDT_2021-01-01.json'), 'w') as f:
+            with open(os.path.join(data_directory, 'BTC_USDT_2021-01-01.jsonl'), 'w') as f:
                 existing_candle = [1609459200000, 29000, 29500, 28900, 29400, 100]
                 f.write(json.dumps(existing_candle) + '\n')
-            with open(os.path.join(data_directory, 'ETH_USDT_2021-01-02.json'), 'w') as f:
+            with open(os.path.join(data_directory, 'ETH_USDT_2021-01-02.jsonl'), 'w') as f:
                 existing_candle_eth = [1609545600000, 730, 750, 720, 740, 200]
                 f.write(json.dumps(existing_candle_eth) + '\n')
 
