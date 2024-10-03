@@ -9,16 +9,18 @@ using command-line flags.
 
 Usage Example:
 --------------
-To fetch the latest 315 minutes of BTC/USD candle data:
+To fetch the latest 315 minutes of BTC/USD candle data from Binance:
 
     python tickr_client.py \
         --github_token="your_github_token" \
+        --exchange="binance" \
         --trade_symbol="BTC/USD"
 
-To fetch data for a specific time range and timeframe:
+To fetch data for a specific time range and timeframe from Coinbase:
 
     python tickr_client.py \
         --github_token="your_github_token" \
+        --exchange="coinbase" \
         --trade_symbol="BTC/USD" \
         --start_timestamp=1677628800000 \
         --end_timestamp=1677715199000 \
@@ -41,6 +43,7 @@ FLAGS = flags.FLAGS
 
 # Required flags (without default values)
 flags.DEFINE_string('github_token', None, 'GitHub token for authentication.')
+flags.DEFINE_string('exchange', None, 'Exchange name, e.g., "binance", "coinbase".')
 flags.DEFINE_string('trade_symbol', None, 'Symbol of the cryptocurrency, e.g., "BTC/USD".')
 
 # Optional flags (with default values)
@@ -50,33 +53,41 @@ flags.DEFINE_string('timeframe', '1m', 'Timeframe for candle data, e.g., "1m", "
 flags.DEFINE_integer('start_timestamp', None, 'Start timestamp in milliseconds since epoch.')
 flags.DEFINE_integer('end_timestamp', None, 'End timestamp in milliseconds since epoch.')
 
+# Mark required flags
+flags.mark_flag_as_required('github_token')
+flags.mark_flag_as_required('exchange')
+flags.mark_flag_as_required('trade_symbol')
+
 
 class TickrClient:
     """Client for fetching cryptocurrency candle data from a GitHub repository.
 
     The TickrClient class provides methods to fetch candle data for a specified
-    cryptocurrency symbol and time range from data files stored in a GitHub repository.
+    exchange, cryptocurrency symbol, and time range from data files stored in a GitHub repository.
 
     Attributes:
         github: An instance of the PyGithub Github class for GitHub API interaction.
         repo_name: The name of the GitHub repository containing the data.
         data_directory: The directory in the repository where data files are stored.
+        exchange: The name of the exchange, e.g., "binance", "coinbase".
         symbol: The symbol of the cryptocurrency, e.g., "BTC/USD".
         repo: The Repository object representing the GitHub repository.
     """
 
-    def __init__(self, github_token: str, repo_name: str, data_directory: str, symbol: str):
+    def __init__(self, github_token: str, repo_name: str, data_directory: str, exchange: str, symbol: str):
         """Initializes the TickrClient with GitHub authentication and repository details.
 
         Args:
             github_token: GitHub token for authentication.
             repo_name: Name of the GitHub repository.
             data_directory: Directory where data files are stored in the repo.
+            exchange: Exchange name, e.g., "binance", "coinbase".
             symbol: Symbol of the cryptocurrency, e.g., "BTC/USD".
         """
         self.github = Github(github_token)
         self.repo_name = repo_name
         self.data_directory = data_directory
+        self.exchange = exchange
         self.symbol = symbol
         self.repo = self._get_repo()
 
@@ -136,7 +147,7 @@ class TickrClient:
         ]
 
         # Collect file paths
-        prefix = f"{self.symbol.replace('/', '_')}_"
+        prefix = f"{self.exchange}/{self.symbol.replace('/', '_')}_"
         file_paths = []
         for date in dates:
             date_str = date.strftime('%Y-%m-%d')
@@ -156,6 +167,9 @@ class TickrClient:
             for line in lines:
                 candle = json.loads(line)
                 candles.append(candle)
+
+        if not candles:
+            raise ValueError("No candle data found in the specified time range.")
 
         # Convert to DataFrame
         df = pd.DataFrame(
@@ -285,6 +299,7 @@ def main(argv):
         github_token=FLAGS.github_token,
         repo_name=FLAGS.repo_name,
         data_directory=FLAGS.repo_data_directory,
+        exchange=FLAGS.exchange,
         symbol=FLAGS.trade_symbol,
     )
 
