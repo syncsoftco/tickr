@@ -4,144 +4,271 @@ tickr_client.py
 A high-level API client for accessing cryptocurrency candle data stored in a GitHub repository.
 The TickrClient class provides an easy interface to fetch the most recent candles or specify a date range.
 
+This script can also be run as a standalone program to fetch and display candle data
+using command-line flags.
+
 License: MIT
 """
 
-from github import Github
+import datetime
 import json
-from datetime import datetime, timedelta
-import time
+import pandas as pd
+from typing import Optional
+from github import Github, Repository
+import base64
+from absl import app
+from absl import flags
+
+# Define command-line flags
+FLAGS = flags.FLAGS
+
+flags.DEFINE_string('github_token', None, 'GitHub token for authentication.')
+flags.DEFINE_string('repo_name', None, 'Name of the GitHub repository.')
+flags.DEFINE_string('repo_data_directory', 'data', 'Directory where data files are stored in the repo.')
+flags.DEFINE_string('trade_symbol', None, 'Symbol of the cryptocurrency, e.g., "BTC/USD".')
+flags.DEFINE_integer('start_timestamp', None, 'Start timestamp in milliseconds since epoch.')
+flags.DEFINE_integer('end_timestamp', None, 'End timestamp in milliseconds since epoch.')
+flags.DEFINE_string('timeframe', '1m', 'Timeframe for candle data, e.g., "1m", "5m", "1h".')
+
+# Mark required flags
+flags.mark_flag_as_required('github_token')
+flags.mark_flag_as_required('repo_name')
+flags.mark_flag_as_required('symbol')
+flags.mark_flag_as_required('start_timestamp')
+flags.mark_flag_as_required('end_timestamp')
+
 
 class TickrClient:
-    def __init__(self, token=None):
+    """Client for fetching cryptocurrency candle data from a GitHub repository.
+
+    The TickrClient class provides methods to fetch candle data for a specified
+    cryptocurrency symbol and time range from data files stored in a GitHub repository.
+
+    Attributes:
+        github: An instance of the PyGithub Github class for GitHub API interaction.
+        repo_name: The name of the GitHub repository containing the data.
+        data_directory: The directory in the repository where data files are stored.
+        symbol: The symbol of the cryptocurrency, e.g., "BTC/USD".
+        repo: The Repository object representing the GitHub repository.
+    """
+
+    def __init__(self, github_token: str, repo_name: str, data_directory: str, symbol: str):
+        """Initializes the TickrClient with GitHub authentication and repository details.
+
+        Args:
+            github_token: GitHub token for authentication.
+            repo_name: Name of the GitHub repository.
+            data_directory: Directory where data files are stored in the repo.
+            symbol: Symbol of the cryptocurrency, e.g., "BTC/USD".
         """
-        Initializes the TickrClient with an optional GitHub token.
-        
-        :param token: (Optional) GitHub token for authenticated API requests.
+        self.github = Github(github_token)
+        self.repo_name = repo_name
+        self.data_directory = data_directory
+        self.symbol = symbol
+        self.repo = self._get_repo()
+
+    def _get_repo(self) -> Repository.Repository:
+        """Retrieves the GitHub repository object.
+
+        Returns:
+            The Repository object corresponding to repo_name.
+
+        Raises:
+            ValueError: If the repository cannot be accessed.
         """
-        self.github = Github(token)
-        self.repo_name = "syncsoftco/tickr"
-        self.repo = self.github.get_repo(self.repo_name)
-    
-    def get_candles(self, symbol, timeframe, start_date=None, end_date=None):
+        try:
+            repo = self.github.get_repo(self.repo_name)
+            return repo
+        except Exception as e:
+            raise ValueError(f"Unable to access repository '{self.repo_name}': {e}")
+
+    def get_candles(
+        self,
+        start_timestamp: int,
+        end_timestamp: int,
+        timeframe: str = '1m'
+    ) -> pd.DataFrame:
+        """Fetches candle data between the specified timestamps.
+
+        Args:
+            start_timestamp: Start timestamp in milliseconds since epoch.
+            end_timestamp: End timestamp in milliseconds since epoch.
+            timeframe: Timeframe for candle data, e.g., '1m', '5m', '1h'.
+
+        Returns:
+            A pandas DataFrame containing the candle data.
+
+        Raises:
+            ValueError: If input parameters are invalid or data is insufficient.
         """
-        Fetches candle data for a given symbol and timeframe. If start_date and end_date are not provided,
-        it defaults to fetching the most recent 100 candles.
+        if start_timestamp is None:
+            raise ValueError("start_timestamp must be specified")
+        if end_timestamp is None:
+            raise ValueError("end_timestamp must be specified")
+        if end_timestamp <= start_timestamp:
+            raise ValueError("end_timestamp must be greater than start_timestamp")
 
-        :param symbol: The trading symbol (e.g., 'BTC/USDT').
-        :param timeframe: The timeframe (e.g., '1m', '5m', '1h', '1d').
-        :param start_date: (Optional) The start date for the data (datetime or epoch timestamp).
-        :param end_date: (Optional) The end date for the data (datetime or epoch timestamp).
-        :return: A list of candles within the specified time range.
-        """
-        if timeframe == '1M':
-            raise ValueError("1 month time frame is not supported. Maximum is 1 week.")
+        # Calculate start and end dates based on provided timestamps
+        start_date = datetime.datetime.fromtimestamp(
+            start_timestamp / 1000, tz=datetime.timezone.utc
+        ).date()
+        end_date = datetime.datetime.fromtimestamp(
+            end_timestamp / 1000, tz=datetime.timezone.utc
+        ).date()
 
-        if end_date is None:
-            end_date = datetime.now()
-        if start_date is None:
-            start_date = self._calculate_default_start_date(end_date, timeframe)
-        
-        # Get list of file paths to check
-        file_paths = self._get_sharded_file_paths(symbol, timeframe, start_date, end_date)
-        candles = []
+        # Generate list of dates between start_date and end_date inclusive
+        delta = end_date - start_date
+        dates = [
+            start_date + datetime.timedelta(days=i) for i in range(delta.days + 1)
+        ]
 
-        # Load candles from each relevant file
-        for file_path in file_paths:
-            try:
-                file_content = self.repo.get_contents(file_path)
-                file_candles = json.loads(file_content.decoded_content.decode())
-                candles.extend(file_candles)
-            except Exception as e:
-                print(f"Error fetching data from {file_path}: {e}")
-                continue
-
-        # Convert date range to timestamps
-        start_timestamp = self._convert_to_timestamp(start_date)
-        end_timestamp = self._convert_to_timestamp(end_date)
-
-        # Filter candles within the specified range
-        candles = [candle for candle in candles if self._is_within_range(candle[0], start_timestamp, end_timestamp)]
-
-        return candles
-
-    def _get_sharded_file_paths(self, symbol, timeframe, start_date, end_date):
-        """
-        Constructs the list of file paths that may contain data within the given date range.
-
-        :param symbol: The trading symbol (e.g., 'BTC/USDT').
-        :param timeframe: The timeframe (e.g., '1m', '5m', '1h', '1d').
-        :param start_date: The start date for the data (datetime).
-        :param end_date: The end date for the data (datetime).
-        :return: A list of file paths to check in the repository.
-        """
+        # Collect file paths
+        prefix = f"{self.symbol.replace('/', '_')}_"
         file_paths = []
-        current_date = start_date
+        for date in dates:
+            date_str = date.strftime('%Y-%m-%d')
+            file_path = f"{self.data_directory}/{prefix}{date_str}.jsonl"
+            try:
+                self.repo.get_contents(file_path)
+                file_paths.append(file_path)
+            except Exception:
+                raise ValueError(f"Data file for date {date_str} is missing.")
 
-        while current_date <= end_date:
-            year = current_date.year
-            month = current_date.month
-            file_name = f"{symbol.replace('/', '-')}_{timeframe}_{year}-{month:02d}.json"
-            file_path = f"data/{symbol.replace('/', '-')}/{timeframe}/{year}/{month:02d}/{file_name}"
-            file_paths.append(file_path)
+        # Read candles from files
+        candles = []
+        for file_path in file_paths:
+            file_content = self.repo.get_contents(file_path)
+            decoded_content = base64.b64decode(file_content.content).decode('utf-8')
+            lines = decoded_content.strip().split('\n')
+            for line in lines:
+                candle = json.loads(line)
+                candles.append(candle)
 
-            # Move to the next month
-            next_month = month % 12 + 1
-            next_year = year + (1 if next_month == 1 else 0)
-            current_date = datetime(next_year, next_month, 1)
+        # Convert to DataFrame
+        df = pd.DataFrame(
+            candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume']
+        )
+        # Convert timestamp to datetime and set as index
+        df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms', utc=True)
+        df.set_index('datetime', inplace=True)
 
-        return file_paths
+        # Filter candles between start_timestamp and end_timestamp
+        df = df[
+            (df['timestamp'] >= start_timestamp) & (df['timestamp'] <= end_timestamp)
+        ]
 
-    def _calculate_default_start_date(self, end_date, timeframe):
+        if df.empty:
+            raise ValueError("No data available in the specified time range.")
+
+        # Check for missing data
+        expected_timestamps = pd.date_range(
+            start=datetime.datetime.fromtimestamp(
+                start_timestamp / 1000, tz=datetime.timezone.utc
+            ),
+            end=datetime.datetime.fromtimestamp(
+                end_timestamp / 1000, tz=datetime.timezone.utc
+            ),
+            freq='1min',
+        )
+        missing_timestamps = expected_timestamps.difference(df.index)
+
+        if not missing_timestamps.empty:
+            raise ValueError(
+                "Data is insufficient to cover the requested time range due to missing candles."
+            )
+
+        # Resample data to the specified timeframe
+        if timeframe != '1m':
+            df = self.resample_candles(df, timeframe)
+
+        return df
+
+    def resample_candles(self, df: pd.DataFrame, timeframe: str) -> pd.DataFrame:
+        """Resamples the candle data to a different timeframe.
+
+        Args:
+            df: DataFrame containing the original candle data.
+            timeframe: The new timeframe to resample to.
+
+        Returns:
+            A pandas DataFrame with resampled candle data.
+
+        Raises:
+            ValueError: If the timeframe is unsupported.
         """
-        Calculates the default start date based on the given timeframe, aiming to fetch the last 100 candles.
-
-        :param end_date: The end date for the data (datetime).
-        :param timeframe: The timeframe (e.g., '1m', '5m', '1h', '1d').
-        :return: The calculated start date (datetime).
-        """
-        timeframe_seconds = {
-            '1m': 60,
-            '5m': 300,
-            '15m': 900,
-            '1h': 3600,
-            '6h': 21600,
-            '12h': 43200,
-            '1d': 86400,
-            '1w': 604800,
-        }
-
-        if timeframe not in timeframe_seconds:
+        # Map timeframe to pandas offset alias
+        freq = self.timeframe_to_pandas_freq(timeframe)
+        if freq is None:
             raise ValueError(f"Unsupported timeframe: {timeframe}")
 
-        time_delta = timedelta(seconds=timeframe_seconds[timeframe] * 100)
-        return end_date - time_delta
+        # Define how to aggregate the data
+        ohlc_dict = {
+            'open': 'first',
+            'high': 'max',
+            'low': 'min',
+            'close': 'last',
+            'volume': 'sum',
+            'timestamp': 'first',  # Use the timestamp of the first candle in the resampled period
+        }
+        # Resample and aggregate the data
+        resampled_df = df.resample(freq).agg(ohlc_dict).dropna()
 
-    def _convert_to_timestamp(self, date):
-        """
-        Converts a datetime or epoch timestamp to milliseconds since the epoch.
+        return resampled_df
 
-        :param date: The date to convert (datetime or epoch timestamp).
-        :return: The timestamp in milliseconds.
-        """
-        if isinstance(date, datetime):
-            return int(time.mktime(date.timetuple()) * 1000)
-        elif isinstance(date, (int, float)):
-            return int(date * 1000 if date < 1e12 else date)
-        else:
-            raise ValueError("Unsupported date format. Please use a datetime object or an epoch timestamp.")
+    def timeframe_to_pandas_freq(self, timeframe: str) -> Optional[str]:
+        """Converts a timeframe string to a pandas frequency string.
 
-    def _is_within_range(self, timestamp, start, end):
-        """
-        Checks if a given timestamp is within the specified start and end range.
+        Args:
+            timeframe: Timeframe string, e.g., '1m', '5m', '1h'.
 
-        :param timestamp: The timestamp to check (in milliseconds).
-        :param start: The start timestamp (in milliseconds).
-        :param end: The end timestamp (in milliseconds).
-        :return: True if within range, False otherwise.
+        Returns:
+            The corresponding pandas frequency string, or None if unsupported.
         """
-        if start and timestamp < start:
-            return False
-        if end and timestamp > end:
-            return False
-        return True
+        # Map timeframe strings to pandas frequency strings
+        mapping = {
+            '1m': '1T',
+            '3m': '3T',
+            '5m': '5T',
+            '15m': '15T',
+            '30m': '30T',
+            '1h': '1H',
+            '2h': '2H',
+            '4h': '4H',
+            '1d': '1D',
+        }
+        return mapping.get(timeframe)
+
+
+def main(argv):
+    """Main method to fetch cryptocurrency candle data and print it.
+
+    Parses command-line flags to create a TickrClient instance, fetches candle data,
+    and prints the resulting DataFrame.
+
+    Args:
+        argv: Command-line arguments (unused).
+    """
+    del argv  # Unused.
+
+    # Construct TickrClient instance
+    client = TickrClient(
+        github_token=FLAGS.github_token,
+        repo_name=FLAGS.repo_name,
+        data_directory=FLAGS.repo_data_directory,
+        symbol=FLAGS.symbol,
+    )
+
+    # Fetch candles
+    try:
+        df = client.get_candles(
+            start_timestamp=FLAGS.start_timestamp,
+            end_timestamp=FLAGS.end_timestamp,
+            timeframe=FLAGS.timeframe,
+        )
+        print(df)
+    except Exception as e:
+        print(f"Error fetching candles: {e}")
+
+
+if __name__ == '__main__':
+    app.run(main)
