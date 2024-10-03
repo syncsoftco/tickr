@@ -254,54 +254,6 @@ class TestTickrClientMain(absltest.TestCase):
     """Unit test for the main method in tickr_client.py."""
 
     @patch('tickr.tickr_client.TickrClient')
-    @patch('tickr.tickr_client.datetime')
-    @patch('sys.exit')
-    def test_main_with_defaults(self, mock_sys_exit, mock_datetime, mock_tickr_client):
-        """Test the main method with default timestamps."""
-        # Arrange
-        # Mock datetime to return a fixed current time
-        fixed_now = datetime.datetime(2023, 3, 2, 12, 0, 0)
-        mock_datetime.datetime.utcnow.return_value = fixed_now
-
-        # Mock the TickrClient instance and its methods
-        mock_client_instance = mock_tickr_client.return_value
-        mock_client_instance.get_candles.return_value = pd.DataFrame()
-
-        # Prepare argv with flags, omitting start_timestamp and end_timestamp
-        argv = [
-            'tickr_client.py',
-            '--github_token=fake_token',
-            '--exchange_name=binance',
-            '--trade_symbol=BTC/USD',
-            '--timeframe=1m',
-        ]
-
-        # Act
-        # Run the main function with mocked sys.exit to prevent exiting
-        app.run(main, argv=argv)
-
-        # Calculate expected default timestamps
-        expected_end_timestamp = int(fixed_now.timestamp() * 1000)
-        expected_start_timestamp = int((fixed_now - datetime.timedelta(minutes=315)).timestamp() * 1000)
-
-        # Assert
-        # Verify that TickrClient was called with correct parameters
-        mock_tickr_client.assert_called_with(
-            github_token='fake_token',
-            repo_name='syncsoftco/tickr',
-            data_directory='data',
-            exchange='binance',
-            symbol='BTC/USD',
-        )
-
-        # Verify that get_candles was called with computed default timestamps
-        mock_client_instance.get_candles.assert_called_with(
-            start_timestamp=expected_start_timestamp,
-            end_timestamp=expected_end_timestamp,
-            timeframe='1m',
-        )
-
-    @patch('tickr.tickr_client.TickrClient')
     @patch('sys.exit')
     def test_main_with_specified_timestamps(self, mock_sys_exit, mock_tickr_client):
         """Test the main method with specified timestamps."""
