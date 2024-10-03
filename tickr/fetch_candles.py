@@ -90,7 +90,7 @@ class CandleFetcher:
                 return last_candle[0] + 1  # Continue from the last timestamp
 
             # Empty file, use the date from filename
-            latest_date_str = latest_file[len(prefix):-5]  # Remove prefix and '.json'
+            latest_date_str = latest_file[len(prefix):-6]  # Remove prefix and '.jsonl'
             latest_date = datetime.datetime.strptime(latest_date_str, '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc)
             return int(latest_date.timestamp() * 1000)
 
@@ -104,7 +104,7 @@ class CandleFetcher:
             daily_candles[date_str].append(candle)
 
         for date_str, candles in daily_candles.items():
-            file_name = f"{self.symbol.replace('/', '_')}_{date_str}.json"
+            file_name = f"{self.symbol.replace('/', '_')}_{date_str}.jsonl"
             file_path = os.path.join(self.data_directory, file_name)
             with open(file_path, 'a') as f:
                 for candle in candles:
