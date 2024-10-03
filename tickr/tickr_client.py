@@ -25,7 +25,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('github_token', None, 'GitHub token for authentication.')
 flags.DEFINE_string('repo_name', None, 'Name of the GitHub repository.')
 flags.DEFINE_string('repo_data_directory', 'data', 'Directory where data files are stored in the repo.')
-flags.DEFINE_string('symbol', None, 'Symbol of the cryptocurrency, e.g., "BTC/USD".')
+flags.DEFINE_string('trade_symbol', None, 'Symbol of the cryptocurrency, e.g., "BTC/USD".')
 flags.DEFINE_integer('start_timestamp', None, 'Start timestamp in milliseconds since epoch.')
 flags.DEFINE_integer('end_timestamp', None, 'End timestamp in milliseconds since epoch.')
 flags.DEFINE_string('timeframe', '1m', 'Timeframe for candle data, e.g., "1m", "5m", "1h".')
