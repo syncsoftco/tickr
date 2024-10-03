@@ -8,6 +8,7 @@ License: MIT
 
 import unittest
 from unittest.mock import patch, MagicMock
+import base64
 import pandas as pd
 import datetime
 import json
