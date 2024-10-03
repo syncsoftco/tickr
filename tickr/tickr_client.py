@@ -7,6 +7,23 @@ The TickrClient class provides an easy interface to fetch the most recent candle
 This script can also be run as a standalone program to fetch and display candle data
 using command-line flags.
 
+Usage Example:
+--------------
+To fetch the latest 315 minutes of BTC/USD candle data:
+
+    python tickr_client.py \
+        --github_token="your_github_token" \
+        --symbol="BTC/USD"
+
+To fetch data for a specific time range and timeframe:
+
+    python tickr_client.py \
+        --github_token="your_github_token" \
+        --symbol="BTC/USD" \
+        --start_timestamp=1677628800000 \
+        --end_timestamp=1677715199000 \
+        --timeframe="5m"
+
 License: MIT
 """
 
@@ -22,20 +39,20 @@ from absl import flags
 # Define command-line flags
 FLAGS = flags.FLAGS
 
+# Required flags (without default values)
 flags.DEFINE_string('github_token', None, 'GitHub token for authentication.')
-flags.DEFINE_string('repo_name', None, 'Name of the GitHub repository.')
-flags.DEFINE_string('repo_data_directory', 'data', 'Directory where data files are stored in the repo.')
 flags.DEFINE_string('trade_symbol', None, 'Symbol of the cryptocurrency, e.g., "BTC/USD".')
+
+# Optional flags (with default values)
+flags.DEFINE_string('repo_name', 'syncsoftco/tickr', 'Name of the GitHub repository.')
+flags.DEFINE_string('repo_data_directory', 'data', 'Directory where data files are stored in the repo.')
+flags.DEFINE_string('timeframe', '1m', 'Timeframe for candle data, e.g., "1m", "5m", "1h".')
 flags.DEFINE_integer('start_timestamp', None, 'Start timestamp in milliseconds since epoch.')
 flags.DEFINE_integer('end_timestamp', None, 'End timestamp in milliseconds since epoch.')
-flags.DEFINE_string('timeframe', '1m', 'Timeframe for candle data, e.g., "1m", "5m", "1h".')
 
 # Mark required flags
 flags.mark_flag_as_required('github_token')
-flags.mark_flag_as_required('repo_name')
 flags.mark_flag_as_required('symbol')
-flags.mark_flag_as_required('start_timestamp')
-flags.mark_flag_as_required('end_timestamp')
 
 
 class TickrClient:
@@ -245,24 +262,41 @@ def main(argv):
     Parses command-line flags to create a TickrClient instance, fetches candle data,
     and prints the resulting DataFrame.
 
+    If start_timestamp and end_timestamp are not provided, they default to 315 minutes ago
+    and the current time, respectively.
+
     Args:
         argv: Command-line arguments (unused).
     """
     del argv  # Unused.
+
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    
+    # Compute default timestamps if not provided
+    if FLAGS.start_timestamp:
+        start_timestamp = FLAGS.start_timestamp
+    else:
+        start_time = now - datetime.timedelta(minutes=315)
+        start_timestamp = int(start_time.timestamp() * 1000)
+
+    if FLAGS.end_timestamp:
+        end_timestamp = FLAGS.end_timestamp
+    else:
+        end_timestamp = int(now.timestamp() * 1000)
 
     # Construct TickrClient instance
     client = TickrClient(
         github_token=FLAGS.github_token,
         repo_name=FLAGS.repo_name,
         data_directory=FLAGS.repo_data_directory,
-        symbol=FLAGS.symbol,
+        symbol=FLAGS.trade_symbol,
     )
 
     # Fetch candles
     try:
         df = client.get_candles(
-            start_timestamp=FLAGS.start_timestamp,
-            end_timestamp=FLAGS.end_timestamp,
+            start_timestamp=start_timestamp,
+            end_timestamp=end_timestamp,
             timeframe=FLAGS.timeframe,
         )
         print(df)
