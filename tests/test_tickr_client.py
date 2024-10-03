@@ -255,7 +255,7 @@ class TestTickrClientMain(absltest.TestCase):
             '--github_token=fake_token',
             '--repo_name=user/repo',
             '--data_directory=data',
-            '--symbol=BTC/USD',
+            '--trade_symbol=BTC/USD',
             '--start_timestamp=1677628800000',
             '--end_timestamp=1677715199000',
             '--timeframe=1m',
