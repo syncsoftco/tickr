@@ -12,9 +12,8 @@ import base64
 import pandas as pd
 import datetime
 import json
-from tickr.tickr_client import TickrClient
+from tickr.tickr_client import TickrClient, main
 from absl.testing import absltest
-from absl.testing import flagsaver
 
 class TestTickrClient(unittest.TestCase):
     """Test suite for the TickrClient class."""
@@ -241,27 +240,31 @@ class TestTickrClient(unittest.TestCase):
 class TestTickrClientMain(absltest.TestCase):
     """Unit test for the main method in tickr_client.py."""
 
-    @flagsaver.flagsaver(
-        github_token='fake_token',
-        repo_name='user/repo',
-        data_directory='data',
-        symbol='BTC/USD',
-        start_timestamp=1677628800000,
-        end_timestamp=1677715199000,
-        timeframe='1m',
-    )
     @patch('tickr.tickr_client.TickrClient')
-    def test_main(self, mock_tickr_client):
+    @patch('sys.exit')
+    def test_main(self, mock_sys_exit, mock_tickr_client):
         """Test the main method to ensure it constructs the TickrClient correctly."""
         # Arrange
         # Mock the TickrClient instance and its methods
         mock_client_instance = mock_tickr_client.return_value
         mock_client_instance.get_candles.return_value = pd.DataFrame()
 
+        # Prepare argv with flags
+        argv = [
+            'tickr_client.py',
+            '--github_token=fake_token',
+            '--repo_name=user/repo',
+            '--data_directory=data',
+            '--symbol=BTC/USD',
+            '--start_timestamp=1677628800000',
+            '--end_timestamp=1677715199000',
+            '--timeframe=1m',
+        ]
+
         # Act
-        # Call the main function
-        from tickr.tickr_client import main
-        main([])
+        # Run the main function with mocked sys.exit to prevent exiting
+        from absl import app
+        app.run(main, argv=argv)
 
         # Assert
         # Verify that TickrClient was called with correct parameters
@@ -278,7 +281,6 @@ class TestTickrClientMain(absltest.TestCase):
             end_timestamp=1677715199000,
             timeframe='1m',
         )
-
 
 if __name__ == '__main__':
     absltest.main()
