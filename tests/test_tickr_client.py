@@ -8,68 +8,219 @@ License: MIT
 
 import unittest
 from unittest.mock import patch, MagicMock
-from tickr.tickr_client import TickrClient
-from datetime import datetime, timedelta
+import pandas as pd
+import datetime
 import json
+from tickr_client import TickrClient
+
 
 class TestTickrClient(unittest.TestCase):
-    @patch('tickr.tickr_client.Github')
-    def setUp(self, MockGithub):
-        """
-        Set up the TickrClient for testing with mocked GitHub API responses.
-        """
-        mock_repo = MockGithub().get_repo.return_value
-        mock_file_content = MagicMock()
-        # Use fixed timestamps that should clearly fall within any reasonable date range
-        mock_file_content.decoded_content = json.dumps([
-            [1609459200000, 29000, 29500, 28800, 29400, 1000],  # 2021-01-01 00:00:00 UTC
-            [1609545600000, 29400, 29700, 29200, 29500, 1200]   # 2021-01-02 00:00:00 UTC
-        ]).encode('utf-8')  # Ensure this is in bytes as expected from GitHub API
-        mock_repo.get_contents.return_value = mock_file_content
-        
-        self.client = TickrClient()
+    def setUp(self):
+        # Arrange
+        self.github_token = 'fake_token'
+        self.repo_name = 'user/repo'
+        self.data_directory = 'data'
+        self.symbol = 'BTC/USD'
+        self.prefix = f"{self.symbol.replace('/', '_')}_"
 
-    def test_default_date_range(self):
-        """
-        Test the default start and end date calculation for fetching the last 100 candles.
-        """
-        symbol = "BTC/USDT"
-        timeframe = "1h"
-        # Forcing the default calculation to match mock data
-        end_date = datetime.now()
-        start_date = datetime(2021, 1, 1)  # Adjust this as needed to match mock data
-        candles = self.client.get_candles(symbol, timeframe, start_date=start_date, end_date=end_date)
-        
-        self.assertIsNotNone(candles, "Candles should not be None")
-        self.assertTrue(len(candles) > 0, "Candles should contain data")
+        # Create sample candle data
+        self.sample_dates = [
+            datetime.date(2023, 3, 1),
+            datetime.date(2023, 3, 2),
+        ]
+        self.sample_files = {}
+        for date in self.sample_dates:
+            date_str = date.strftime('%Y-%m-%d')
+            file_name = f"{self.data_directory}/{self.prefix}{date_str}.jsonl"
+            candles = []
+            timestamp_start = int(
+                datetime.datetime.combine(
+                    date, datetime.time.min, tzinfo=datetime.timezone.utc
+                ).timestamp()
+                * 1000
+            )
+            timestamp_end = (
+                timestamp_start + 24 * 60 * 60 * 1000 - 60000
+            )  # up to 23:59
+            for ts in range(timestamp_start, timestamp_end + 1, 60000):
+                candles.append([ts, 1.0, 1.0, 1.0, 1.0, 1.0])
+            content = '\n'.join([json.dumps(c) for c in candles])
+            self.sample_files[file_name] = base64.b64encode(
+                content.encode('utf-8')
+            ).decode('utf-8')
 
-    def test_custom_date_range(self):
-        """
-        Test fetching candles with a custom date range.
-        """
-        symbol = "BTC/USDT"
-        timeframe = "1h"
-        start_date = datetime(2021, 1, 1)
-        end_date = datetime(2021, 1, 3)
+    @patch('TickrClient.Github')
+    def test_start_timestamp_not_specified(self, mock_github):
+        # Arrange
+        sut = CandleReader(
+            self.github_token, self.repo_name, self.data_directory, self.symbol
+        )
+        start_timestamp = None
+        end_timestamp = 1677715200000  # March 2, 2023 00:00:00 UTC in milliseconds
 
-        candles = self.client.get_candles(symbol, timeframe, start_date=start_date, end_date=end_date)
-        
-        self.assertIsNotNone(candles, "Candles should not be None")
-        self.assertTrue(len(candles) > 0, "Candles should contain data")
-        self.assertTrue(all(start_date <= datetime.fromtimestamp(candle[0] / 1000) <= end_date for candle in candles), 
-                        "All candles should be within the specified date range")
-
-    def test_unsupported_timeframe(self):
-        """
-        Test that an unsupported timeframe raises an appropriate error.
-        """
-        symbol = "BTC/USDT"
-        timeframe = "1M"
-
+        # Act & Assert
         with self.assertRaises(ValueError) as context:
-            self.client.get_candles(symbol, timeframe)
+            sut.get_candles(start_timestamp, end_timestamp)
 
-        self.assertTrue("1 month time frame is not supported" in str(context.exception))
+        self.assertEqual(str(context.exception), "start_timestamp must be specified")
 
-if __name__ == "__main__":
-    unittest.main()
+    @patch('tickr.tickr_client.Github')
+    def test_end_timestamp_not_specified(self, mock_github):
+        # Arrange
+        sut = CandleReader(
+            self.github_token, self.repo_name, self.data_directory, self.symbol
+        )
+        start_timestamp = 1677628800000  # March 1, 2023 00:00:00 UTC
+        end_timestamp = None
+
+        # Act & Assert
+        with self.assertRaises(ValueError) as context:
+            sut.get_candles(start_timestamp, end_timestamp)
+
+        self.assertEqual(str(context.exception), "end_timestamp must be specified")
+
+    @patch('tickr.tickr_client.Github')
+    def test_data_insufficient_missing_file(self, mock_github):
+        # Arrange
+        mock_repo = MagicMock()
+        mock_github.return_value.get_repo.return_value = mock_repo
+
+        # Simulate missing file for 2023-02-28
+        def get_contents_side_effect(file_path):
+            if '2023-02-28' in file_path:
+                raise Exception("File not found")
+            else:
+                content_file = MagicMock()
+                content_file.content = self.sample_files[file_path]
+                return content_file
+
+        mock_repo.get_contents.side_effect = get_contents_side_effect
+
+        sut = CandleReader(
+            self.github_token, self.repo_name, self.data_directory, self.symbol
+        )
+        # Request data from Feb 28, 2023, which we don't have
+        start_timestamp = 1677542400000  # Feb 28, 2023 00:00:00 UTC
+        end_timestamp = 1677628799000  # Feb 28, 2023 23:59:59 UTC
+
+        # Act & Assert
+        with self.assertRaises(ValueError) as context:
+            sut.get_candles(start_timestamp, end_timestamp)
+
+        self.assertEqual(str(context.exception), "Data file for date 2023-02-28 is missing.")
+
+    @patch('tickr.tickr_client.Github')
+    def test_data_sufficient(self, mock_github):
+        # Arrange
+        mock_repo = MagicMock()
+        mock_github.return_value.get_repo.return_value = mock_repo
+
+        def get_contents_side_effect(file_path):
+            content_file = MagicMock()
+            content_file.content = self.sample_files[file_path]
+            return content_file
+
+        mock_repo.get_contents.side_effect = get_contents_side_effect
+
+        sut = CandleReader(
+            self.github_token, self.repo_name, self.data_directory, self.symbol
+        )
+        start_timestamp = 1677628800000  # March 1, 2023 00:00:00 UTC
+        end_timestamp = 1677715199000  # March 1, 2023 23:59:59 UTC
+
+        # Act
+        df = sut.get_candles(start_timestamp, end_timestamp)
+
+        # Assert
+        expected_rows = 1440  # 24 hours * 60 minutes
+        self.assertEqual(len(df), expected_rows)
+
+    @patch('tickr.tickr_client.Github')
+    def test_resampling(self, mock_github):
+        # Arrange
+        mock_repo = MagicMock()
+        mock_github.return_value.get_repo.return_value = mock_repo
+
+        def get_contents_side_effect(file_path):
+            content_file = MagicMock()
+            content_file.content = self.sample_files[file_path]
+            return content_file
+
+        mock_repo.get_contents.side_effect = get_contents_side_effect
+
+        sut = CandleReader(
+            self.github_token, self.repo_name, self.data_directory, self.symbol
+        )
+        start_timestamp = 1677628800000  # March 1, 2023 00:00:00 UTC
+        end_timestamp = 1677715199000  # March 1, 2023 23:59:59 UTC
+
+        # Act
+        df = sut.get_candles(start_timestamp, end_timestamp, timeframe='1h')
+
+        # Assert
+        expected_rows = 24  # 24 hours
+        self.assertEqual(len(df), expected_rows)
+
+    @patch('tickr.tickr_client.Github')
+    def test_missing_candles(self, mock_github):
+        # Arrange
+        # Simulate missing candles in the data
+        mock_repo = MagicMock()
+        mock_github.return_value.get_repo.return_value = mock_repo
+
+        # Remove candles from March 1, 2023 12:00 to 12:59
+        def get_contents_side_effect(file_path):
+            content_file = MagicMock()
+            decoded_content = base64.b64decode(self.sample_files[file_path]).decode('utf-8')
+            lines = decoded_content.strip().split('\n')
+            filtered_lines = []
+            for line in lines:
+                candle = json.loads(line)
+                ts = candle[0]
+                if not (1677672000000 <= ts <= 1677675599000):  # Exclude 12:00 to 12:59
+                    filtered_lines.append(line)
+            new_content = '\n'.join(filtered_lines)
+            content_file.content = base64.b64encode(new_content.encode('utf-8')).decode('utf-8')
+            return content_file
+
+        mock_repo.get_contents.side_effect = get_contents_side_effect
+
+        sut = CandleReader(
+            self.github_token, self.repo_name, self.data_directory, self.symbol
+        )
+        start_timestamp = 1677628800000  # March 1, 2023 00:00:00 UTC
+        end_timestamp = 1677715199000  # March 1, 2023 23:59:59 UTC
+
+        # Act & Assert
+        with self.assertRaises(ValueError) as context:
+            sut.get_candles(start_timestamp, end_timestamp)
+
+        self.assertEqual(
+            str(context.exception),
+            "Data is insufficient to cover the requested time range due to missing candles.",
+        )
+
+    @patch('tickr.tickr_client.Github')
+    def test_unsupported_timeframe(self, mock_github):
+        # Arrange
+        mock_repo = MagicMock()
+        mock_github.return_value.get_repo.return_value = mock_repo
+
+        def get_contents_side_effect(file_path):
+            content_file = MagicMock()
+            content_file.content = self.sample_files[file_path]
+            return content_file
+
+        mock_repo.get_contents.side_effect = get_contents_side_effect
+
+        sut = CandleReader(
+            self.github_token, self.repo_name, self.data_directory, self.symbol
+        )
+        start_timestamp = 1677628800000  # March 1, 2023 00:00:00 UTC
+        end_timestamp = 1677715199000  # March 1, 2023 23:59:59 UTC
+
+        # Act & Assert
+        with self.assertRaises(ValueError) as context:
+            sut.get_candles(start_timestamp, end_timestamp, timeframe='7m')
+
+        self.assertEqual(str(context.exception), "Unsupported timeframe: 7m")
